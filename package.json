@@ -1,0 +1,43 @@
+{
+  "name": "devpulse",
+  "version": "1.0.0",
+  "description": "Interactive TUI dashboard and process orchestrator for microservices and fullstack development",
+  "main": "dist/cli.js",
+  "type": "module",
+  "bin": {
+    "devpulse": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "check": "tsc --noEmit",
+    "clean": "rm -rf dist *.tgz",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli.js",
+    "prepack": "npm run build",
+    "test": "npx tsx test/theme_verification_test.ts && npx tsx test/wizard_test.tsx && npx tsx test/mouse_click_test.tsx && npx tsx test/dashboard_click_test.tsx && npx tsx test/arrow_scroll_responsiveness_test.ts && npx tsx test/tab_click_and_nested_click_test.tsx && npx tsx test/fixture_run_test.ts && npx tsx test/process_manager_test.ts && npx tsx test/real_log_stream_test.tsx && npx tsx test/stop_restart_lifecycle_test.tsx"
+  },
+  "keywords": [
+    "tui",
+    "terminal",
+    "dashboard",
+    "microservices",
+    "developer-tools",
+    "ink",
+    "process-manager"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ink": "^7.1.1",
+    "react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

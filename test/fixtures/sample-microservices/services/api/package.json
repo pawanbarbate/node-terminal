@@ -1,0 +1,8 @@
+{
+  "name": "api-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "echo 'API running on port 8000'"
+  }
+}
+
