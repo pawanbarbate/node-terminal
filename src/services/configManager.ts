@@ -22,7 +22,7 @@ export interface ConfigFileSummary {
   name: string;
   version?: string;
   servicesCount: number;
-  services: Array<{ name: string; port?: number; command: string }>;
+  services: Array<{ name: string; port?: number; command: string | string[] }>;
   isValid: boolean;
   error?: string;
 }

@@ -37,9 +37,11 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
       case 'running':
         return theme.colors.running;
       case 'stopped':
+      case 'blocked':
         return theme.colors.stopped;
       case 'warning':
       case 'starting':
+      case 'waiting':
         return theme.colors.warning;
       default:
         return theme.colors.textMuted;
@@ -136,7 +138,9 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                       {`[${portText}] `}
                     </Text>
                   ) : null}
-                  <Text color={isSelected ? theme.colors.running : theme.colors.textMuted}>{service.uptime}</Text>
+                  <Text color={isSelected ? (service.status === 'running' ? theme.colors.running : dotColor) : theme.colors.textMuted}>
+                    {service.status === 'running' ? service.uptime : (service.statusText || service.status.toUpperCase())}
+                  </Text>
                 </Box>
               </Clickable>
             );
@@ -158,7 +162,7 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
               width="100%"
               marginBottom={0}
             >
-              {/* Row 1: Status Indicator, Service Name & Uptime */}
+              {/* Row 1: Status Indicator, Service Name & Uptime / Status */}
               <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
                 <Box flexDirection="row" alignItems="center" flexShrink={1}>
                   <Text color={isSelected ? theme.colors.accent : dotColor} bold={isSelected}>
@@ -169,7 +173,15 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                   </Text>
                 </Box>
                 <Box flexShrink={0} marginLeft={1}>
-                  <Text color={isSelected ? theme.colors.running : theme.colors.textMuted}>{service.uptime}</Text>
+                  {service.status === 'running' ? (
+                    <Text color={isSelected ? theme.colors.running : theme.colors.textMuted}>
+                      {service.uptime}
+                    </Text>
+                  ) : (
+                    <Text color={dotColor} bold={isSelected}>
+                      {service.statusText || String(service.status).toUpperCase()}
+                    </Text>
+                  )}
                 </Box>
               </Box>
 
@@ -177,7 +189,7 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
               <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
                 <Box flexShrink={1} flexGrow={0}>
                   <Text color={isSelected ? theme.colors.textSecondary : theme.colors.textMuted} wrap="truncate-end">
-                    {'↓ '}{service.command}
+                    {'↓ '}{Array.isArray(service.command) ? (service.command as string[]).join(' && ') : service.command}
                   </Text>
                 </Box>
                 {portText ? (

@@ -90,7 +90,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       return detected.map(d => ({
         name: d.name || 'app',
         path: d.path || '.',
-        command: d.command || 'npm run dev',
+        command: Array.isArray(d.command) ? d.command.join(' && ') : (d.command || 'npm run dev'),
         port: d.port,
         autoStart: d.autoStart ?? true
       }));
@@ -106,7 +106,10 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   // Active form field values
   const [name, setName] = useState(() => (detected.length > 0 ? services[0]?.name || '' : ''));
   const [pathValue, setPathValue] = useState(() => (detected.length > 0 ? services[0]?.path || '' : ''));
-  const [command, setCommand] = useState(() => (detected.length > 0 ? services[0]?.command || 'npm run dev' : 'npm run dev'));
+  const [command, setCommand] = useState<string>(() => {
+    const firstCmd = detected.length > 0 ? services[0]?.command : undefined;
+    return Array.isArray(firstCmd) ? firstCmd.join(' && ') : (firstCmd || 'npm run dev');
+  });
   const [port, setPort] = useState(() => (detected.length > 0 && services[0]?.port ? String(services[0].port) : ''));
   const [autoStart, setAutoStart] = useState<boolean>(() => (detected.length > 0 ? services[0]?.autoStart ?? true : true));
   const [focusedField, setFocusedField] = useState<WizardFormField>('name');
@@ -116,7 +119,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   const loadServiceToForm = useCallback((svc: ServiceConfig) => {
     setName(svc.name);
     setPathValue(svc.path);
-    setCommand(svc.command);
+    setCommand(Array.isArray(svc.command) ? svc.command.join(' && ') : (svc.command || ''));
     setPort(svc.port ? String(svc.port) : '');
     setAutoStart(svc.autoStart !== false);
     setError(null);
@@ -233,7 +236,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   const handleApplySuggestion = useCallback((sug: Partial<ServiceConfig>) => {
     if (sug.name) setName(sug.name);
     if (sug.path) setPathValue(sug.path);
-    if (sug.command) setCommand(sug.command);
+    if (sug.command) setCommand(Array.isArray(sug.command) ? sug.command.join(' && ') : sug.command);
     if (sug.port) setPort(String(sug.port));
     if (sug.autoStart !== undefined) setAutoStart(sug.autoStart);
     setError(null);

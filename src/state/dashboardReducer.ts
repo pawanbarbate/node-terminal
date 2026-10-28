@@ -78,7 +78,9 @@ export function configToServices(config?: DevPulseConfig): Service[] {
     statusText: s.autoStart !== false ? 'STARTING' : 'STOPPED',
     uptime: '0s',
     uptimeSeconds: 0,
-    command: s.command,
+    command: Array.isArray(s.command)
+      ? s.command.join(' && ')
+      : (s.command || (Array.isArray(s.commands) ? s.commands.join(' && ') : '')),
     path: s.path,
     port: s.port ? `:${s.port}` : ':3000',
     pid: '-',
@@ -141,7 +143,7 @@ export type DashboardAction =
   | { type: 'TICK_CLOCK'; time: string; cpuChange: number }
   | { type: 'APPEND_GLOBAL_LOG'; log: LogEntry; timeStr: string }
   | { type: 'APPEND_REAL_LOG'; serviceName: string; log: LogEntry }
-  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string }
+  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string }
   | { type: 'UPDATE_SERVICE_METRICS'; metrics: Record<string, { cpu?: string; memory?: string }> };
 
 export function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
@@ -408,7 +410,7 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
           return {
             ...s,
             status: action.status,
-            statusText: action.status.toUpperCase(),
+            statusText: action.statusText || action.status.toUpperCase(),
             pid: action.pid ? String(action.pid) : (action.status === 'stopped' ? '-' : s.pid),
             uptime: isNowRunning ? (wasRunning ? s.uptime : '0s') : '0s',
             uptimeSeconds: isNowRunning ? (wasRunning ? s.uptimeSeconds : 0) : 0,

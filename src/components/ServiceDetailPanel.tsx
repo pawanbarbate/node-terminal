@@ -81,6 +81,20 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
           text: 'WARN', 
           dot: theme.colors.warning 
         };
+      case 'waiting':
+        return { 
+          bg: theme.colors.warningBg, 
+          fg: theme.colors.warning, 
+          text: service.statusText || 'WAITING', 
+          dot: theme.colors.warning 
+        };
+      case 'blocked':
+        return { 
+          bg: theme.colors.stoppedBg, 
+          fg: theme.colors.stopped, 
+          text: service.statusText || 'BLOCKED', 
+          dot: theme.colors.stopped 
+        };
       default:
         return { 
           bg: theme.colors.card, 
@@ -204,9 +218,18 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
           {/* Command Pill */}
           <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={1}>
             <Text color={theme.colors.textSecondary} wrap="truncate-end">
-              [ ↓ {service.command} ]
+              [ ↓ {Array.isArray(service.command) ? (service.command as string[]).join(' && ') : service.command} ]
             </Text>
           </Box>
+
+          {/* Dependencies Pill (if defined) */}
+          {service.rawConfig?.dependsOn && service.rawConfig.dependsOn.length > 0 ? (
+            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={0}>
+              <Text color={theme.colors.textDim}>[ needs: </Text>
+              <Text color={theme.colors.accent}>{service.rawConfig.dependsOn.join(', ')}</Text>
+              <Text color={theme.colors.textDim}> ]</Text>
+            </Box>
+          ) : null}
 
           {/* PID Pill */}
           <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={0}>

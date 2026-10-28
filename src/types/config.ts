@@ -1,10 +1,14 @@
 export interface ServiceConfig {
   name: string;
   path: string;
-  command: string;
+  command: string | string[];
+  commands?: string[];
+  preStart?: string[];
+  dependsOn?: string[];
   port?: number;
   autoStart?: boolean;
   envFile?: string;
+  readyPattern?: string;
 }
 
 export interface DevPulseConfig {

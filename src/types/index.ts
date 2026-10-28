@@ -1,6 +1,6 @@
 import { ServiceConfig } from './config.js';
 
-export type ServiceStatus = 'running' | 'stopped' | 'starting' | 'warning';
+export type ServiceStatus = 'running' | 'stopped' | 'starting' | 'warning' | 'waiting' | 'blocked';
 
 export type ActivePanel = 'services' | 'serviceLogs' | 'globalLogs';
 
@@ -61,7 +61,7 @@ export interface Service {
 
 export interface ProcessCallbacks {
   onLog: (serviceName: string, log: LogEntry) => void;
-  onStatusChange: (serviceName: string, status: ServiceStatus, pid?: number, error?: string) => void;
+  onStatusChange: (serviceName: string, status: ServiceStatus, pid?: number, error?: string, statusText?: string) => void;
 }
 
 export interface SystemMetrics {
