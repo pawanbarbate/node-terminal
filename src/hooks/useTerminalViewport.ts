@@ -51,13 +51,13 @@ export function useTerminalViewport(overrideWidth?: number, overrideHeight?: num
   }
   const rightPanelWidth = Math.max(30, width - leftPanelWidth - 1);
 
-  // Dynamic Panel Heights & Log Line Budgeting:
+  // Dynamic Panel Heights & Log Line Budgeting (accounting for 1-row marginBottom):
   const systemPanelHeight = isUltraCompactHeight ? 3 : 8;
-  const servicesPanelHeight = Math.max(4, contentHeight - systemPanelHeight);
+  const servicesPanelHeight = Math.max(4, contentHeight - systemPanelHeight - 1);
 
-  // Right Column: Detail ~48%, Global Logs remainder
+  // Right Column: Detail ~48%, Global Logs remainder (accounting for 1-row marginBottom)
   const detailPanelHeight = isUltraCompactHeight ? 5 : Math.max(6, Math.floor(contentHeight * 0.48));
-  const globalLogsPanelHeight = Math.max(5, contentHeight - detailPanelHeight);
+  const globalLogsPanelHeight = Math.max(5, contentHeight - detailPanelHeight - 1);
 
   // Logs calculation
   let maxServiceLogs = Math.max(1, detailPanelHeight - 7);

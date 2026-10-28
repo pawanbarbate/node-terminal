@@ -12,6 +12,7 @@ interface UseTerminalInputProps {
   clickManagerRef?: React.RefObject<ClickManagerContextValue | null>;
   onRestart?: (index: number) => void;
   onToggleStop?: (index: number) => void;
+  onSwitchConfig?: () => void;
 }
 
 export function useTerminalInput({
@@ -21,7 +22,8 @@ export function useTerminalInput({
   exit,
   clickManagerRef,
   onRestart,
-  onToggleStop
+  onToggleStop,
+  onSwitchConfig
 }: UseTerminalInputProps) {
   const lastServiceNavTimeRef = useRef(0);
   const lastLogScrollTimeRef = useRef(0);
@@ -34,6 +36,9 @@ export function useTerminalInput({
 
   const onToggleStopRef = useRef(onToggleStop);
   onToggleStopRef.current = onToggleStop;
+
+  const onSwitchConfigRef = useRef(onSwitchConfig);
+  onSwitchConfigRef.current = onSwitchConfig;
 
   useInput((input, key) => {
     // -------------------------------------------------------------
@@ -325,6 +330,14 @@ export function useTerminalInput({
     if (input === 's' || input === 'S') {
       if (onToggleStopRef.current) onToggleStopRef.current(stateRef.current.selectedIndex);
       return;
+    }
+
+    // Switch configuration profile
+    if (input === 'p' || input === 'P') {
+      if (onSwitchConfigRef.current) {
+        onSwitchConfigRef.current();
+        return;
+      }
     }
 
     // Search and filter

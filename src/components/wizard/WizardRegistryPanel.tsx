@@ -21,6 +21,7 @@ export interface WizardRegistryPanelProps {
   isUltraNarrow?: boolean;
   presets?: ArchitecturePreset[];
   workspaceName?: string;
+  configFilename?: string;
   onSelectService?: (index: number) => void;
   onAddService?: () => void;
   onRemoveService?: () => void;
@@ -45,6 +46,7 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
   isUltraNarrow = false,
   presets = [],
   workspaceName = 'Workspace',
+  configFilename = 'config.devpulse.json',
   onSelectService,
   onAddService,
   onRemoveService,
@@ -52,8 +54,8 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
   onApplyPreset
 }) => {
   const innerWidth = Math.max(16, panelWidth - 4);
-  // Allocate available rows for cards
-  const maxVisibleServices = Math.max(1, Math.floor((contentHeight - 10) / 2));
+  // Allocate available rows for enclosed cards (4 rows per card)
+  const maxVisibleServices = Math.max(1, Math.floor((contentHeight - 10) / 4));
 
   return (
     <Box 
@@ -82,7 +84,7 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
         <Box flexDirection="row" alignItems="center" flexWrap="nowrap" marginBottom={1}>
           <Text color={theme.colors.accent}>📦 </Text>
           <Text color={theme.colors.textPrimary} bold>{workspaceName}</Text>
-          <Text color={theme.colors.textDim}> │ devpulse.config.json</Text>
+          <Text color={theme.colors.textDim}> │ {configFilename}</Text>
         </Box>
 
         {/* Empty State with Architecture Presets */}
@@ -130,7 +132,7 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
             </Box>
           </Box>
         ) : (
-          /* Elevated Service Cards List (Matching Main Dashboard Synergy) */
+          /* Discrete Enclosed Service Cards (Matching Main Dashboard Synergy) */
           <Box flexDirection="column" width="100%">
             {services.slice(0, maxVisibleServices).map((svc, idx) => {
               const isSelected = idx === selectedIndex && !isEditingNew;
@@ -141,44 +143,46 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
                   key={idx}
                   id={`service-row-${idx}`}
                   onClick={() => onSelectService?.(idx)}
+                  borderStyle="round"
+                  borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
+                  backgroundColor={isSelected ? theme.colors.card : undefined}
+                  paddingX={1}
+                  flexDirection="column"
                   width="100%"
+                  marginBottom={0}
                 >
-                  <Box 
-                    flexDirection="column"
-                    backgroundColor={isSelected ? theme.colors.card : undefined}
-                    paddingX={1}
-                    marginBottom={0}
-                    width="100%"
-                  >
-                    {/* Row 1: Accent Indicator, Name, Port & Auto-boot pill */}
-                    <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
-                      <Box flexDirection="row" alignItems="center" flexShrink={1}>
-                        <Text color={isSelected ? theme.colors.accent : theme.colors.running} bold>
-                          {isSelected ? '▎ ' : '● '}
-                        </Text>
-                        <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected}>
-                          {svc.name}
-                        </Text>
-                      </Box>
-                      <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
-                        {portText ? (
-                          <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
-                            {portText}{' '}
-                          </Text>
-                        ) : null}
-                        <Text color={svc.autoStart !== false ? theme.colors.running : theme.colors.textMuted}>
-                          {svc.autoStart !== false ? '[AUTO]' : '[MANUAL]'}
-                        </Text>
-                      </Box>
+                  {/* Row 1: Accent Indicator, Name, Port & Auto-boot pill */}
+                  <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
+                    <Box flexDirection="row" alignItems="center" flexShrink={1}>
+                      <Text color={isSelected ? theme.colors.accent : theme.colors.running} bold>
+                        {isSelected ? '▎ ' : '● '}
+                      </Text>
+                      <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
+                        {svc.name}
+                      </Text>
                     </Box>
+                    <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
+                      {portText ? (
+                        <Text backgroundColor={isSelected ? theme.colors.accentDark : undefined} color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
+                          {`[${portText}] `}
+                        </Text>
+                      ) : null}
+                      <Text color={svc.autoStart !== false ? theme.colors.running : theme.colors.textMuted}>
+                        {svc.autoStart !== false ? '[AUTO]' : '[MANUAL]'}
+                      </Text>
+                    </Box>
+                  </Box>
 
-                    {/* Row 2: Subtitle Path & Execution Command */}
-                    <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
-                      <Text color={theme.colors.textDim}>
+                  {/* Row 2: Subtitle Path & Execution Command */}
+                  <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
+                    <Box flexShrink={1} flexGrow={0}>
+                      <Text color={theme.colors.textDim} wrap="truncate-end">
                         {svc.path}
                       </Text>
-                      <Text color={theme.colors.textMuted}>
-                        ↓ {svc.command}
+                    </Box>
+                    <Box flexShrink={0} marginLeft={1}>
+                      <Text color={isSelected ? theme.colors.textSecondary : theme.colors.textMuted} wrap="truncate-end">
+                        {'↓ '}{svc.command}
                       </Text>
                     </Box>
                   </Box>

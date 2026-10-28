@@ -9,13 +9,15 @@ export interface FooterProps {
   activePanel?: ActivePanel;
   width?: number;
   onToggleHelp?: () => void;
+  onSwitchConfig?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = React.memo(({ 
   isConnected = true, 
   activePanel = 'services', 
   width = 120,
-  onToggleHelp
+  onToggleHelp,
+  onSwitchConfig
 }) => {
   const isNarrow = width < 85;
 
@@ -79,6 +81,15 @@ export const Footer: React.FC<FooterProps> = React.memo(({
           <Text color={theme.colors.textPrimary} bold>t</Text>
         </Box>
         <Text color={theme.colors.textSecondary}>Panel </Text>
+
+        {onSwitchConfig && (
+          <Clickable onClick={() => onSwitchConfig?.()} flexDirection="row">
+            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
+              <Text color={theme.colors.accent} bold>p</Text>
+            </Box>
+            <Text color={theme.colors.accent}>Profile </Text>
+          </Clickable>
+        )}
       </Box>
 
       {/* Right connection indicator */}

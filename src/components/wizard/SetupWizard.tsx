@@ -17,6 +17,7 @@ export interface SetupWizardProps {
   onCancel?: () => void;
   width?: number;
   height?: number;
+  configFilePath?: string;
 }
 
 export const ARCHITECTURE_PRESETS: ArchitecturePreset[] = [
@@ -56,22 +57,19 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   onComplete,
   onCancel,
   width: propWidth,
-  height: propHeight
+  height: propHeight,
+  configFilePath
 }) => {
   const viewport = useTerminalViewport(propWidth, propHeight);
   const clickManagerRef = useRef<ClickManagerContextValue | null>(null);
   const workspaceName = path.basename(process.cwd()) || 'Workspace';
+  const activeConfigFilename = configFilePath ? path.basename(configFilePath) : 'config.devpulse.json';
 
   // Assert clean SGR mouse reporting mode on mount
   useEffect(() => {
     try {
       process.stdout.write('\x1b[?1000h\x1b[?1006h');
     } catch {}
-    return () => {
-      try {
-        process.stdout.write('\x1b[?1000l\x1b[?1006l');
-      } catch {}
-    };
   }, []);
 
   // Live clock timer for top Header
@@ -227,9 +225,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       services
     };
 
-    saveConfigFile(config);
+    saveConfigFile(config, process.cwd(), configFilePath);
     onComplete(config);
-  }, [services, onComplete]);
+  }, [services, onComplete, configFilePath]);
 
   // Apply auto-detected suggestion
   const handleApplySuggestion = useCallback((sug: Partial<ServiceConfig>) => {
@@ -473,6 +471,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
                 isUltraNarrow={true}
                 presets={ARCHITECTURE_PRESETS}
                 workspaceName={workspaceName}
+                configFilename={activeConfigFilename}
                 onSelectService={(idx) => {
                   setSelectedIndex(idx);
                   setIsEditingNew(false);
@@ -530,6 +529,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
                 contentHeight={contentHeight}
                 presets={ARCHITECTURE_PRESETS}
                 workspaceName={workspaceName}
+                configFilename={activeConfigFilename}
                 onSelectService={(idx) => {
                   setSelectedIndex(idx);
                   setIsEditingNew(false);

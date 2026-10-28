@@ -133,51 +133,74 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
       height={height}
       marginTop={0}
     >
-      {/* Header: Guaranteed 1 line with inline modern pills */}
+      {/* Header: Guaranteed 1 line with Boxed Controls */}
       <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
         {/* Left Title */}
         <Box flexDirection="row" alignItems="center" flexShrink={0}>
           <Text color={isFocused ? theme.colors.accent : theme.colors.textSecondary} bold>GLOBAL LOGS </Text>
           {!isNarrow && <Text color={theme.colors.textMuted}>({activeFilter}) </Text>}
           {effectiveOffset > 0 ? (
-            <Text color={theme.colors.warning} bold> ▲ (+{effectiveOffset}) [{startIdx + 1}-{endIdx}/{totalFiltered}]</Text>
+            <Box backgroundColor={theme.colors.card} paddingX={1} flexShrink={0}>
+              <Text color={theme.colors.warning} bold>▲ (+{effectiveOffset}) [{startIdx + 1}-{endIdx}/{totalFiltered}]</Text>
+            </Box>
           ) : isFocused ? (
-            <Text color={theme.colors.accent}> [↑↓ Scroll]</Text>
+            <Box backgroundColor={theme.colors.card} paddingX={1} flexShrink={0}>
+              <Text color={theme.colors.accent}>[↑↓ Scroll]</Text>
+            </Box>
           ) : null}
         </Box>
 
-        {/* Right Controls: 1-line inline pills */}
+        {/* Right Controls: Boxed Pills */}
         <Box flexDirection="row" alignItems="center" flexShrink={0}>
           {/* Search pill */}
           <Clickable onClick={() => onToggleSearch?.()}>
-            <Text 
+            <Box 
               backgroundColor={isSearching ? theme.colors.accentDark : theme.colors.card} 
-              color={isSearching ? theme.colors.accent : theme.colors.textSecondary}
+              paddingX={1}
+              marginRight={1}
+              flexShrink={0}
             >
-              {' '}🔍 {isNarrow ? (searchQuery || '') : (searchQuery || 'Search...')}{' '}
-            </Text>
+              <Text color={isSearching ? theme.colors.accent : theme.colors.textSecondary}>
+                [ 🔍 {isNarrow ? (searchQuery || '') : (searchQuery || 'Search...')} ]
+              </Text>
+            </Box>
           </Clickable>
-          <Text> </Text>
 
           {/* Filter dropdown pill */}
           <Clickable onClick={() => onCycleFilter?.()}>
-            <Text backgroundColor={theme.colors.card} color={theme.colors.textSecondary}>
-              {' '}{isNarrow ? (activeFilter === 'All Services' ? 'All' : activeFilter) : activeFilter} ∨{' '}
-            </Text>
+            <Box 
+              backgroundColor={theme.colors.card} 
+              paddingX={1}
+              marginRight={1}
+              flexShrink={0}
+            >
+              <Text color={theme.colors.textSecondary}>
+                [ {isNarrow ? (activeFilter === 'All Services' ? 'All' : activeFilter) : activeFilter} ∨ ]
+              </Text>
+            </Box>
           </Clickable>
-          <Text> </Text>
 
           {/* Live badge pill */}
           <Clickable onClick={() => onToggleLive?.()}>
-            <Text 
+            <Box 
               backgroundColor={isLive ? theme.colors.runningBg : theme.colors.warningBg} 
-              color={isLive ? theme.colors.running : theme.colors.warning} 
-              bold
+              paddingX={1}
+              flexShrink={0}
             >
-              {' '}● {isLive ? 'Live' : 'Off'}{' '}
-            </Text>
+              <Text 
+                color={isLive ? theme.colors.running : theme.colors.warning} 
+                bold
+              >
+                [ ● {isLive ? 'Live' : 'Off'} ]
+              </Text>
+            </Box>
           </Clickable>
         </Box>
+      </Box>
+
+      {/* Hairline Separator under Header Controls */}
+      <Box width="100%" height={1} overflow="hidden">
+        <Text color={theme.colors.borderSubtle}>{'─'.repeat(innerWidth)}</Text>
       </Box>
 
       {/* Global Logs Stream */}
@@ -190,10 +213,12 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
               <Box width={9} flexShrink={0}>
                 <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
               </Box>
-              <Box width={10} marginRight={1} flexShrink={0}>
-                <Text backgroundColor={badge.bg} color={badge.fg} bold>
-                  {badge.label}
+              <Box width={11} flexShrink={0} marginRight={1}>
+                <Text color={theme.colors.textDim}>[</Text>
+                <Text color={badge.color} bold>
+                  {badge.cleanLabel.padEnd(8)}
                 </Text>
+                <Text color={theme.colors.textDim}>] </Text>
               </Box>
               <Box flexGrow={1} flexShrink={1}>
                 {renderMessage(log)}
