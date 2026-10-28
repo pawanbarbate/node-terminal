@@ -23,8 +23,8 @@ export function useProcessRunner({ config, state, dispatch }: UseProcessRunnerPr
         dispatch({ type: 'APPEND_REAL_LOG', serviceName, log });
       }
     },
-    onStatusChange: (serviceName: string, status, pid, error) => {
-      dispatch({ type: 'PROCESS_STATUS_CHANGED', serviceName, status, pid, error });
+    onStatusChange: (serviceName: string, status, pid, error, statusText) => {
+      dispatch({ type: 'PROCESS_STATUS_CHANGED', serviceName, status, pid, error, statusText });
     }
   });
 

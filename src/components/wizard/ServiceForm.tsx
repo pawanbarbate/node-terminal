@@ -28,7 +28,9 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({
 }) => {
   const [name, setName] = useState(initialValues?.name || '');
   const [pathValue, setPathValue] = useState(initialValues?.path || '');
-  const [command, setCommand] = useState(initialValues?.command || 'npm run dev');
+  const [command, setCommand] = useState<string>(
+    Array.isArray(initialValues?.command) ? initialValues.command.join(' && ') : (initialValues?.command || 'npm run dev')
+  );
   const [port, setPort] = useState(initialValues?.port ? String(initialValues.port) : '');
   const [autoStart, setAutoStart] = useState<boolean>(initialValues?.autoStart ?? true);
   const [focusedField, setFocusedField] = useState<FieldName>('name');
@@ -39,7 +41,7 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({
   const handleApplySuggestion = (sug: Partial<ServiceConfig>) => {
     if (sug.name) setName(sug.name);
     if (sug.path) setPathValue(sug.path);
-    if (sug.command) setCommand(sug.command);
+    if (sug.command) setCommand(Array.isArray(sug.command) ? sug.command.join(' && ') : sug.command);
     if (sug.port) setPort(String(sug.port));
     if (sug.autoStart !== undefined) setAutoStart(sug.autoStart);
   };

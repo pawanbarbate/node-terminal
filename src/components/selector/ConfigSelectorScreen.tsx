@@ -116,7 +116,8 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
   });
 
   const contentHeight = Math.max(14, viewport.height - 3);
-  const containerWidth = Math.min(viewport.width, 100);
+  const containerWidth = Math.min(Math.max(68, viewport.width - 6), 90);
+  const innerWidth = Math.max(20, containerWidth - 6);
 
   return (
     <ClickProvider clickManagerRef={clickManagerRef}>
@@ -145,23 +146,30 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
             borderColor={theme.colors.borderDefault}
             backgroundColor={theme.colors.surface}
             paddingX={2}
-            paddingY={1}
+            paddingY={0}
           >
-            {/* Title Section */}
-            <Box flexDirection="row" alignItems="center" marginBottom={1}>
-              <Text color={theme.colors.accent} bold>⚡ MULTIPLE CONFIGURATIONS DETECTED</Text>
-              <Text color={theme.colors.textDim}> │ </Text>
-              <Text color={theme.colors.textSecondary}>
-                Found {configs.length} profiles in current workspace
-              </Text>
+            {/* Title Section with Hairline Divider */}
+            <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={0} marginBottom={0} flexWrap="nowrap">
+              <Box flexDirection="row" alignItems="center" flexShrink={0}>
+                <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={0}>
+                  <Text color={theme.colors.accent} bold>⚡ MULTIPLE CONFIGURATIONS DETECTED</Text>
+                </Box>
+                <Text color={theme.colors.textSecondary}>
+                  Found <Text color={theme.colors.textPrimary} bold>{configs.length}</Text> configuration environments
+                </Text>
+              </Box>
+              <Box flexShrink={0}>
+                <Text color={theme.colors.textDim}>[↑↓ / 1-9 to pick]</Text>
+              </Box>
             </Box>
 
-            <Text color={theme.colors.textMuted}>
-              Select a configuration profile to boot services into DevPulse Dashboard:
-            </Text>
+            {/* Hairline Divider under Header */}
+            <Box width="100%" height={1} overflow="hidden" marginBottom={1}>
+              <Text color={theme.colors.borderSubtle}>{'─'.repeat(innerWidth)}</Text>
+            </Box>
 
             {/* List of Available Configurations */}
-            <Box flexDirection="column" marginTop={1} marginBottom={1}>
+            <Box flexDirection="column" marginBottom={1}>
               {configs.map((cfg, idx) => {
                 const isSelected = selectedIndex === idx;
                 const quickKey = idx < 9 ? String(idx + 1) : null;
@@ -176,6 +184,7 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
                     }}
                   >
                     <Box
+                      width="100%"
                       flexDirection="column"
                       borderStyle="round"
                       borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderSubtle}
@@ -184,74 +193,82 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
                       paddingY={0}
                       marginBottom={1}
                     >
-                      {/* Top Line: Quick Key, Filename, Services Badge */}
-                      <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-                        <Box flexDirection="row" alignItems="center">
-                          {isSelected ? (
-                            <Text color={theme.colors.accent} bold>▶ </Text>
-                          ) : (
-                            <Text color={theme.colors.textMuted}>  </Text>
-                          )}
+                      {/* Top Line: Quick Key, Filename, Project Tag, Services Badge */}
+                      <Box width="100%" flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
+                        <Box flexDirection="row" alignItems="center" flexShrink={1}>
+                          <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
+                            {isSelected ? '▶ ' : '  '}
+                          </Text>
 
                           {quickKey && (
                             <Box
-                              backgroundColor={isSelected ? theme.colors.surface : theme.colors.card}
+                              backgroundColor={isSelected ? theme.colors.accent : theme.colors.surface}
                               paddingX={1}
                               marginRight={1}
+                              flexShrink={0}
                             >
-                              <Text color={isSelected ? theme.colors.accent : theme.colors.textSecondary} bold>
+                              <Text color={isSelected ? theme.colors.canvas : theme.colors.textSecondary} bold>
                                 [{quickKey}]
                               </Text>
                             </Box>
                           )}
 
-                          <Text color={theme.colors.textPrimary} bold>
+                          <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold wrap="truncate-end">
                             {cfg.filename}
                           </Text>
 
-                          <Text color={theme.colors.textDim}> │ </Text>
-                          <Text color={theme.colors.textSecondary}>
-                            {cfg.name}
-                          </Text>
+                          {cfg.name ? (
+                            <Box backgroundColor={theme.colors.surface} paddingX={1} marginLeft={1} flexShrink={1}>
+                              <Text color={theme.colors.textDim}>[ </Text>
+                              <Text color={theme.colors.accent} wrap="truncate-end">{cfg.name}</Text>
+                              <Text color={theme.colors.textDim}> ]</Text>
+                            </Box>
+                          ) : null}
                         </Box>
 
-                        <Box flexDirection="row" alignItems="center">
+                        <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
                           {cfg.isValid ? (
-                            <Box backgroundColor={theme.colors.runningBg} paddingX={1}>
+                            <Box backgroundColor={theme.colors.runningBg} paddingX={1} flexShrink={0}>
                               <Text color={theme.colors.running} bold>
-                                {cfg.servicesCount} {cfg.servicesCount === 1 ? 'service' : 'services'}
+                                [ {cfg.servicesCount} {cfg.servicesCount === 1 ? 'Service' : 'Services'} ]
                               </Text>
                             </Box>
                           ) : (
-                            <Box backgroundColor={theme.colors.stoppedBg} paddingX={1}>
+                            <Box backgroundColor={theme.colors.stoppedBg} paddingX={1} flexShrink={0}>
                               <Text color={theme.colors.stopped} bold>
-                                ✖ Invalid JSON
+                                [ ✖ Invalid JSON ]
                               </Text>
                             </Box>
                           )}
                         </Box>
                       </Box>
 
-                      {/* Bottom Line: Services and Ports preview */}
+                      {/* Bottom Line: Structured Discrete Service Pills */}
                       {cfg.isValid && cfg.services.length > 0 && (
-                        <Box flexDirection="row" alignItems="center" marginTop={0} paddingLeft={2} flexWrap="wrap">
-                          <Text color={theme.colors.textMuted}>Services: </Text>
+                        <Box width="100%" flexDirection="row" alignItems="center" marginTop={0} paddingLeft={2} flexWrap="nowrap">
+                          <Text color={theme.colors.textMuted}>Includes: </Text>
                           {cfg.services.slice(0, 5).map((svc, sIdx) => (
-                            <Box key={sIdx} marginRight={1}>
-                              <Text color={theme.colors.accent}>
-                                {svc.name}
-                                {svc.port ? <Text color={theme.colors.warning}>:{svc.port}</Text> : ''}
-                              </Text>
+                            <Box
+                              key={sIdx}
+                              backgroundColor={theme.colors.surface}
+                              paddingX={1}
+                              marginRight={1}
+                              flexShrink={0}
+                            >
+                              <Text color={theme.colors.textPrimary}>{svc.name}</Text>
+                              {svc.port ? <Text color={theme.colors.accent}>:{svc.port}</Text> : null}
                             </Box>
                           ))}
                           {cfg.services.length > 5 && (
-                            <Text color={theme.colors.textDim}>+{cfg.services.length - 5} more</Text>
+                            <Box backgroundColor={theme.colors.surface} paddingX={1} flexShrink={0}>
+                              <Text color={theme.colors.textDim}>+{cfg.services.length - 5} more</Text>
+                            </Box>
                           )}
                         </Box>
                       )}
 
                       {cfg.error && (
-                        <Box paddingLeft={2}>
+                        <Box paddingLeft={2} marginTop={0}>
                           <Text color={theme.colors.stopped}>{cfg.error}</Text>
                         </Box>
                       )}
@@ -261,30 +278,37 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
               })}
             </Box>
 
-            {/* Quick Actions Bar */}
-            <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={1} paddingTop={1} borderStyle="single" borderColor={theme.colors.borderSubtle}>
-              <Clickable id="action-launch" onClick={() => configs[selectedIndex] && onSelect(configs[selectedIndex]!.path)}>
-                <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={2}>
-                  <Text color={theme.colors.accent} bold>▶ Launch Profile (Enter)</Text>
-                </Box>
-              </Clickable>
+            {/* Hairline Divider above Actions */}
+            <Box width="100%" height={1} overflow="hidden" marginBottom={1}>
+              <Text color={theme.colors.borderSubtle}>{'─'.repeat(innerWidth)}</Text>
+            </Box>
 
-              <Clickable id="action-new-wizard" onClick={onNewConfig}>
-                <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={2}>
-                  <Text color={theme.colors.textPrimary} bold>+ New Profile (w)</Text>
-                </Box>
-              </Clickable>
+            {/* Quick Actions Bar - Frameless Integrated Design */}
+            <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={1}>
+              <Box flexDirection="row" alignItems="center">
+                <Clickable id="action-launch" onClick={() => configs[selectedIndex] && onSelect(configs[selectedIndex]!.path)}>
+                  <Box backgroundColor={theme.colors.accent} paddingX={2} marginRight={2}>
+                    <Text color={theme.colors.canvas} bold>▶ Launch Profile (Enter)</Text>
+                  </Box>
+                </Clickable>
+
+                <Clickable id="action-new-wizard" onClick={onNewConfig}>
+                  <Box backgroundColor={theme.colors.card} paddingX={2}>
+                    <Text color={theme.colors.textPrimary} bold>+ New Profile (w)</Text>
+                  </Box>
+                </Clickable>
+              </Box>
 
               <Clickable id="action-exit" onClick={onCancel}>
-                <Box backgroundColor={theme.colors.card} paddingX={1}>
-                  <Text color={theme.colors.textMuted}>✖ Exit (Esc)</Text>
+                <Box backgroundColor={theme.colors.card} paddingX={2}>
+                  <Text color={theme.colors.textMuted}>✕ Exit (Esc)</Text>
                 </Box>
               </Clickable>
             </Box>
           </Box>
         </Box>
 
-        {/* Footer Keybinding Cheatsheet */}
+        {/* Footer Keybinding Cheatsheet matching DevPulse bracket style */}
         <Box
           flexDirection="row"
           justifyContent="space-between"
@@ -293,26 +317,18 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
           paddingX={1}
           backgroundColor={theme.colors.canvas}
         >
-          <Box flexDirection="row" alignItems="center">
-            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
-              <Text color={theme.colors.accent} bold>Click / ↑↓</Text>
-            </Box>
-            <Text color={theme.colors.textMuted}>Select </Text>
+          <Box flexDirection="row" alignItems="center" flexWrap="nowrap">
+            <Text color={theme.colors.accent} bold>[↑↓/Click]</Text>
+            <Text color={theme.colors.textMuted}> Select </Text>
 
-            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
-              <Text color={theme.colors.textPrimary} bold>Enter / 1-9</Text>
-            </Box>
-            <Text color={theme.colors.textMuted}>Launch </Text>
+            <Text color={theme.colors.textPrimary} bold>[Enter/1-9]</Text>
+            <Text color={theme.colors.textMuted}> Launch </Text>
 
-            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
-              <Text color={theme.colors.textPrimary} bold>w</Text>
-            </Box>
-            <Text color={theme.colors.textMuted}>New Profile </Text>
+            <Text color={theme.colors.textPrimary} bold>[w]</Text>
+            <Text color={theme.colors.textMuted}> New Profile </Text>
 
-            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
-              <Text color={theme.colors.textMuted}>Esc</Text>
-            </Box>
-            <Text color={theme.colors.textMuted}>Exit</Text>
+            <Text color={theme.colors.textDim} bold>[Esc]</Text>
+            <Text color={theme.colors.textMuted}> Exit</Text>
           </Box>
 
           <Box flexDirection="row" alignItems="center">
