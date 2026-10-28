@@ -49,7 +49,8 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
   const innerWidth = Math.max(16, panelWidth - 4);
 
   // Windowing calculation: ensure selectedIndex is always within the visible view
-  const cardHeight = isCompactHeight ? 1 : 2;
+  // Option 2 (Enclosed Boxed Cards): 4 rows for 2-line cards, 3 rows for compact 1-line cards
+  const cardHeight = isCompactHeight ? 3 : 4;
   const innerHeight = Math.max(1, (height ? height - 2 : 12) - 1); // height minus borders and header
   const maxVisibleCards = Math.max(1, Math.floor(innerHeight / cardHeight));
 
@@ -94,7 +95,7 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
         </Box>
       </Clickable>
 
-      {/* Services List - Dynamic Windowed Scroll */}
+      {/* Services List - Discrete Enclosed Cards (Boxed Tiles) */}
       <Box flexDirection="column" marginTop={0}>
         {visibleServices.map((service, vIndex) => {
           const index = startIndex + vIndex;
@@ -104,10 +105,6 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
 
           // Compact 1-line mode for standard (<= 25 rows) terminals
           if (isCompactHeight) {
-            const maxNameLen = Math.max(7, innerWidth - 11);
-            const rawName = service.name;
-            const displayName = rawName.length > maxNameLen ? `${rawName.slice(0, maxNameLen - 1)}…` : rawName;
-
             return (
               <Clickable 
                 key={service.id}
@@ -115,66 +112,37 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                   onFocus?.();
                   onSelectService?.(index);
                 }}
+                borderStyle="round"
+                borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
+                backgroundColor={isSelected ? theme.colors.card : undefined}
                 flexDirection="row" 
                 justifyContent="space-between"
                 alignItems="center"
-                backgroundColor={isSelected ? theme.colors.card : undefined}
                 paddingX={1}
-                flexWrap="nowrap"
+                width="100%"
+                marginBottom={0}
               >
-                <Box flexDirection="row" alignItems="center" flexShrink={0}>
+                <Box flexDirection="row" alignItems="center" flexShrink={1}>
                   <Text color={isSelected ? theme.colors.accent : dotColor} bold={isSelected}>
                     {isSelected ? '▎ ' : '● '}
                   </Text>
-                  <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected}>
-                    {displayName}
+                  <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
+                    {service.name}
                   </Text>
                 </Box>
-                <Box flexDirection="row" alignItems="center" flexShrink={0}>
+                <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
                   {portText ? (
-                    <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted}>
-                      {portText}{' '}
+                    <Text backgroundColor={isSelected ? theme.colors.accentDark : undefined} color={isSelected ? theme.colors.accent : theme.colors.textMuted}>
+                      {`[${portText}] `}
                     </Text>
                   ) : null}
-                  <Text color={theme.colors.textMuted}>{service.uptime}</Text>
+                  <Text color={isSelected ? theme.colors.running : theme.colors.textMuted}>{service.uptime}</Text>
                 </Box>
               </Clickable>
             );
           }
 
-          // Full 2-line cards for taller terminals (termHeight >= 26) - fixed 2 lines for visual stability
-          if (isSelected) {
-            return (
-              <Clickable 
-                key={service.id}
-                onClick={() => {
-                  onFocus?.();
-                  onSelectService?.(index);
-                }}
-                backgroundColor={theme.colors.card}
-                paddingX={1}
-                flexDirection="column"
-                marginBottom={0}
-              >
-                <Box flexDirection="row" justifyContent="space-between" flexWrap="nowrap">
-                  <Box flexDirection="row" alignItems="center" flexShrink={0}>
-                    <Text color={theme.colors.accent} bold>▎ </Text>
-                    <Text color={theme.colors.textPrimary} bold>{service.name}</Text>
-                  </Box>
-                  <Text color={theme.colors.running}>{service.uptime}</Text>
-                </Box>
-                <Box flexDirection="row" justifyContent="space-between" flexWrap="nowrap">
-                  <Text color={theme.colors.textSecondary}>  ↓ {service.command}</Text>
-                  {portText ? (
-                    <Text backgroundColor={theme.colors.accentDark} color={theme.colors.accent}>
-                      {` ${portText} `}
-                    </Text>
-                  ) : null}
-                </Box>
-              </Clickable>
-            );
-          }
-
+          // Full 2-line cards for taller terminals (termHeight >= 26) - Discrete Enclosed Cards
           return (
             <Clickable 
               key={service.id}
@@ -182,20 +150,43 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                 onFocus?.();
                 onSelectService?.(index);
               }}
-              paddingX={1}
+              borderStyle="round"
+              borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
+              backgroundColor={isSelected ? theme.colors.card : undefined}
               flexDirection="column"
+              paddingX={1}
+              width="100%"
               marginBottom={0}
             >
-              <Box flexDirection="row" justifyContent="space-between" flexWrap="nowrap">
-                <Box flexDirection="row" alignItems="center" flexShrink={0}>
-                  <Text color={dotColor}>● </Text>
-                  <Text color={theme.colors.textSecondary}>{service.name}</Text>
+              {/* Row 1: Status Indicator, Service Name & Uptime */}
+              <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
+                <Box flexDirection="row" alignItems="center" flexShrink={1}>
+                  <Text color={isSelected ? theme.colors.accent : dotColor} bold={isSelected}>
+                    {isSelected ? '▎ ' : '● '}
+                  </Text>
+                  <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
+                    {service.name}
+                  </Text>
                 </Box>
-                <Text color={theme.colors.textMuted}>{service.uptime}</Text>
+                <Box flexShrink={0} marginLeft={1}>
+                  <Text color={isSelected ? theme.colors.running : theme.colors.textMuted}>{service.uptime}</Text>
+                </Box>
               </Box>
-              <Box flexDirection="row" justifyContent="space-between" flexWrap="nowrap">
-                <Text color={theme.colors.textMuted}>  ↓ {service.command}</Text>
-                {portText && <Text color={theme.colors.textMuted}>{portText}</Text>}
+
+              {/* Row 2: Truncated Command & Port Badge */}
+              <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
+                <Box flexShrink={1} flexGrow={0}>
+                  <Text color={isSelected ? theme.colors.textSecondary : theme.colors.textMuted} wrap="truncate-end">
+                    {'↓ '}{service.command}
+                  </Text>
+                </Box>
+                {portText ? (
+                  <Box flexShrink={0} marginLeft={1}>
+                    <Text backgroundColor={isSelected ? theme.colors.accentDark : undefined} color={isSelected ? theme.colors.accent : theme.colors.textMuted}>
+                      {`[${portText}]`}
+                    </Text>
+                  </Box>
+                ) : null}
               </Box>
             </Clickable>
           );

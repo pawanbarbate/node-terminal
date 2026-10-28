@@ -155,162 +155,180 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
       height={height}
       marginBottom={1}
     >
-      {/* 1. Header: Service Name, Badge & Actions (Guaranteed 1 line) */}
-      <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
-        {/* Left: Name and Pill Badge */}
+      {/* 1. Header: Service Name, Status Badge & Boxed Action Buttons (Guaranteed 1 line) */}
+      <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap" marginBottom={0}>
+        {/* Left: Name and Framed Status Pill */}
         <Box flexDirection="row" alignItems="center" flexShrink={0}>
           <Text color={status.dot}>● </Text>
           <Text color={theme.colors.textPrimary} bold>{service.name} </Text>
-          <Text backgroundColor={status.bg} color={status.fg} bold> {status.text} </Text>
+          <Box backgroundColor={status.bg} paddingX={1}>
+            <Text color={status.fg} bold>[{status.text}]</Text>
+          </Box>
         </Box>
 
-        {/* Right: Modern 1-line Action Pills */}
+        {/* Right: Modern Boxed Action Buttons */}
         <Box flexDirection="row" alignItems="center" flexShrink={0}>
           <Clickable onClick={() => onRestart?.()}>
-            <Text backgroundColor={theme.colors.accentDark} color={theme.colors.accent} bold>
-              {' '}↻ {isNarrow ? 'R' : 'Restart'}{' '}
-            </Text>
+            <Box backgroundColor={theme.colors.card} paddingX={1}>
+              <Text color={theme.colors.accent} bold>
+                [ ↻ {isNarrow ? 'R' : 'Restart'} ]
+              </Text>
+            </Box>
           </Clickable>
           <Text> </Text>
           <Clickable onClick={() => onToggleStop?.()}>
-            <Text 
+            <Box 
               backgroundColor={isRunning ? theme.colors.stoppedBg : theme.colors.runningBg} 
-              color={isRunning ? theme.colors.stopped : theme.colors.running} 
-              bold
+              paddingX={1}
             >
-              {' '}{isRunning ? (isNarrow ? '■ S' : '■ Stop') : (isNarrow ? '▶ R' : '▶ Run')}{' '}
-            </Text>
+              <Text color={isRunning ? theme.colors.stopped : theme.colors.running} bold>
+                [ {isRunning ? (isNarrow ? '■ S' : '■ Stop') : (isNarrow ? '▶ R' : '▶ Run')} ]
+              </Text>
+            </Box>
           </Clickable>
           <Text> </Text>
-          <Text backgroundColor={theme.colors.card} color={theme.colors.textMuted}> ··· </Text>
+          <Box backgroundColor={theme.colors.card} paddingX={1}>
+            <Text color={theme.colors.textMuted}>[ ··· ]</Text>
+          </Box>
         </Box>
       </Box>
+      
+      {/* Hairline Separator under Header Controls */}
+      <Box width="100%" height={1} overflow="hidden">
+        <Text color={theme.colors.borderSubtle}>{'─'.repeat(innerWidth)}</Text>
+      </Box>
 
-      {/* 2. Subheader Metadata (1 line) */}
-      <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={0} flexWrap="nowrap">
+      {/* 2. Subheader Metadata: Distinct Boxed Badges (1 line) */}
+      <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={0} marginBottom={0} flexWrap="nowrap">
         <Box flexDirection="row" alignItems="center" flexShrink={1}>
-          <Text color={theme.colors.textSecondary}>↓ {service.command}</Text>
-          <Text color={theme.colors.textDim}> │ </Text>
-          <Text color={theme.colors.textSecondary}>PID </Text>
-          <Text color={theme.colors.textPrimary} bold>{service.pid}</Text>
+          {/* Command Pill */}
+          <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={1}>
+            <Text color={theme.colors.textSecondary} wrap="truncate-end">
+              [ ↓ {service.command} ]
+            </Text>
+          </Box>
+
+          {/* PID Pill */}
+          <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={0}>
+            <Text color={theme.colors.textDim}>[ PID: </Text>
+            <Text color={theme.colors.textPrimary} bold>{service.pid}</Text>
+            <Text color={theme.colors.textDim}> ]</Text>
+          </Box>
+
+          {/* Port Pill */}
           {cleanPort(service.port) ? (
-            <>
-              <Text color={theme.colors.textDim}> │ </Text>
-              <Text color={theme.colors.accent}>Port {cleanPort(service.port)}</Text>
-            </>
+            <Box backgroundColor={theme.colors.accentDark} paddingX={1} flexShrink={0}>
+              <Text color={theme.colors.accent} bold>
+                [ {cleanPort(service.port)} ]
+              </Text>
+            </Box>
           ) : null}
         </Box>
+
         {effectiveOffset > 0 ? (
-          <Text color={theme.colors.warning} bold>
-            ▲ (+{effectiveOffset}) [{startIdx + 1}-{endIdx}/{totalLogs}]
-          </Text>
+          <Box backgroundColor={theme.colors.card} paddingX={1} flexShrink={0}>
+            <Text color={theme.colors.warning} bold>
+              ▲ (+{effectiveOffset}) [{startIdx + 1}-{endIdx}/{totalLogs}]
+            </Text>
+          </Box>
         ) : isFocused ? (
-          <Text color={theme.colors.accent}>[↑↓ Scroll]</Text>
+          <Box backgroundColor={theme.colors.card} paddingX={1} flexShrink={0}>
+            <Text color={theme.colors.accent}>[↑↓ Scroll]</Text>
+          </Box>
         ) : null}
       </Box>
 
-      {/* 3. Tabs Row & Underline (Hidden in ultra-compact height <= 17 rows) */}
+      {/* Hairline Separator under Header Controls */}
+      <Box width="100%" height={1} overflow="hidden">
+        <Text color={theme.colors.borderSubtle}>{'─'.repeat(innerWidth)}</Text>
+      </Box>
+
+      {/* 3. Boxed Tabs Row & Hairline Separator (Hidden in ultra-compact height <= 17 rows) */}
       {!isUltraCompact && (
-        <Box flexDirection="row" flexWrap="nowrap" marginTop={0} marginBottom={0}>
-          {/* Logs Tab */}
-          <Clickable 
-            onClick={() => {
-              onFocus?.();
-              onSelectTab?.('logs');
-            }}
-            flexDirection="column"
-          >
-            <Box 
-              backgroundColor={activeTab === 'logs' ? theme.colors.card : undefined} 
-              paddingX={1}
+        <Box flexDirection="column" marginTop={0} marginBottom={0}>
+          <Box flexDirection="row" alignItems="center" flexWrap="nowrap" marginTop={0} marginBottom={0}>
+            {/* Logs Tab */}
+            <Clickable 
+              onClick={() => {
+                onFocus?.();
+                onSelectTab?.('logs');
+              }}
             >
-              <Text color={activeTab === 'logs' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'logs'}>
-                Logs
-              </Text>
-            </Box>
-            <Text color={activeTab === 'logs' ? theme.colors.accent : theme.colors.borderSubtle}>──────</Text>
-          </Clickable>
-          <Box flexDirection="column">
-            <Text> </Text>
-            <Text color={theme.colors.borderSubtle}> </Text>
+              <Box 
+                backgroundColor={activeTab === 'logs' ? theme.colors.card : undefined} 
+                paddingX={1}
+                marginRight={1}
+              >
+                <Text color={activeTab === 'logs' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'logs'}>
+                  [ Logs ]
+                </Text>
+              </Box>
+            </Clickable>
+
+            {/* Errors Tab */}
+            <Clickable 
+              onClick={() => {
+                onFocus?.();
+                onSelectTab?.('errors');
+              }}
+            >
+              <Box 
+                backgroundColor={activeTab === 'errors' ? theme.colors.card : undefined} 
+                paddingX={1}
+                marginRight={1}
+              >
+                <Text color={activeTab === 'errors' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'errors'}>
+                  [ Errors{' '}
+                </Text>
+                <Text color={service.errors > 0 ? theme.colors.stopped : theme.colors.textMuted} bold>
+                  ({service.errors || 0})
+                </Text>
+                <Text color={activeTab === 'errors' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'errors'}>
+                  {' ]'}
+                </Text>
+              </Box>
+            </Clickable>
+
+            {/* Metrics Tab */}
+            <Clickable 
+              onClick={() => {
+                onFocus?.();
+                onSelectTab?.('metrics');
+              }}
+            >
+              <Box 
+                backgroundColor={activeTab === 'metrics' ? theme.colors.card : undefined} 
+                paddingX={1}
+                marginRight={1}
+              >
+                <Text color={activeTab === 'metrics' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'metrics'}>
+                  [ Metrics ]
+                </Text>
+              </Box>
+            </Clickable>
+
+            {/* Env Tab */}
+            <Clickable 
+              onClick={() => {
+                onFocus?.();
+                onSelectTab?.('env');
+              }}
+            >
+              <Box 
+                backgroundColor={activeTab === 'env' ? theme.colors.card : undefined} 
+                paddingX={1}
+              >
+                <Text color={activeTab === 'env' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'env'}>
+                  [ Env ]
+                </Text>
+              </Box>
+            </Clickable>
           </Box>
 
-          {/* Errors Tab */}
-          <Clickable 
-            onClick={() => {
-              onFocus?.();
-              onSelectTab?.('errors');
-            }}
-            flexDirection="column"
-          >
-            <Box 
-              backgroundColor={activeTab === 'errors' ? theme.colors.card : undefined} 
-              paddingX={1}
-              flexDirection="row"
-            >
-              <Text color={activeTab === 'errors' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'errors'}>
-                Errors{' '}
-              </Text>
-              <Text color={service.errors > 0 ? theme.colors.stopped : theme.colors.textMuted} bold>
-                ({service.errors || 0})
-              </Text>
-            </Box>
-            <Text color={activeTab === 'errors' ? theme.colors.accent : theme.colors.borderSubtle}>───────────</Text>
-          </Clickable>
-          <Box flexDirection="column">
-            <Text> </Text>
-            <Text color={theme.colors.borderSubtle}> </Text>
+          {/* Hairline Divider under Tabs */}
+          <Box width="100%" height={1} overflow="hidden">
+            <Text color={theme.colors.borderSubtle}>{'─'.repeat(innerWidth)}</Text>
           </Box>
-
-          {/* Metrics Tab */}
-          <Clickable 
-            onClick={() => {
-              onFocus?.();
-              onSelectTab?.('metrics');
-            }}
-            flexDirection="column"
-          >
-            <Box 
-              backgroundColor={activeTab === 'metrics' ? theme.colors.card : undefined} 
-              paddingX={1}
-            >
-              <Text color={activeTab === 'metrics' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'metrics'}>
-                Metrics
-              </Text>
-            </Box>
-            <Text color={activeTab === 'metrics' ? theme.colors.accent : theme.colors.borderSubtle}>─────────</Text>
-          </Clickable>
-          <Box flexDirection="column">
-            <Text> </Text>
-            <Text color={theme.colors.borderSubtle}> </Text>
-          </Box>
-
-          {/* Env Tab */}
-          <Clickable 
-            onClick={() => {
-              onFocus?.();
-              onSelectTab?.('env');
-            }}
-            flexDirection="column"
-          >
-            <Box 
-              backgroundColor={activeTab === 'env' ? theme.colors.card : undefined} 
-              paddingX={1}
-            >
-              <Text color={activeTab === 'env' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'env'}>
-                Env
-              </Text>
-            </Box>
-            <Text color={activeTab === 'env' ? theme.colors.accent : theme.colors.borderSubtle}>─────</Text>
-          </Clickable>
-
-          {/* Trailing underline across remaining width */}
-          {innerWidth > 35 && (
-            <Box flexDirection="column">
-              <Text>{' '.repeat(Math.min(30, innerWidth - 34))}</Text>
-              <Text color={theme.colors.borderDefault}>{'─'.repeat(Math.min(30, innerWidth - 34))}</Text>
-            </Box>
-          )}
         </Box>
       )}
 
@@ -319,10 +337,17 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
         <Box flexDirection="column">
           {visibleLogs.map((log, index) => (
             <Box key={index} flexDirection="row" alignItems="center" flexWrap="nowrap">
-              <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
-              <Text color={theme.colors.accent} backgroundColor={theme.colors.accentDark} bold> INFO </Text>
-              <Text> </Text>
-              {renderLogMessage(log.message)}
+              <Box width={9} flexShrink={0}>
+                <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+              </Box>
+              <Box flexShrink={0} marginRight={1}>
+                <Text color={theme.colors.textDim}>[</Text>
+                <Text color={theme.colors.accent} bold>INFO </Text>
+                <Text color={theme.colors.textDim}>] </Text>
+              </Box>
+              <Box flexGrow={1} flexShrink={1}>
+                {renderLogMessage(log.message)}
+              </Box>
             </Box>
           ))}
         </Box>
@@ -332,11 +357,18 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
         <Box flexDirection="column">
           {service.errorLogs && service.errorLogs.length > 0 ? (
             service.errorLogs.slice(0, maxLogs).map((err, i) => (
-              <Box key={i} flexDirection="row" flexWrap="nowrap">
-                <Text color={theme.colors.textMuted}>{err.timestamp} </Text>
-                <Text color={theme.colors.stopped} backgroundColor={theme.colors.stoppedBg} bold> ERROR </Text>
-                <Text> </Text>
-                <Text color={theme.colors.stopped}>{err.message.slice(0, maxMsgLen)}</Text>
+              <Box key={i} flexDirection="row" alignItems="center" flexWrap="nowrap">
+                <Box width={9} flexShrink={0}>
+                  <Text color={theme.colors.textMuted}>{err.timestamp} </Text>
+                </Box>
+                <Box flexShrink={0} marginRight={1}>
+                  <Text color={theme.colors.textDim}>[</Text>
+                  <Text color={theme.colors.stopped} bold>ERROR</Text>
+                  <Text color={theme.colors.textDim}>] </Text>
+                </Box>
+                <Box flexGrow={1} flexShrink={1}>
+                  <Text color={theme.colors.stopped}>{err.message.slice(0, maxMsgLen)}</Text>
+                </Box>
               </Box>
             ))
           ) : (

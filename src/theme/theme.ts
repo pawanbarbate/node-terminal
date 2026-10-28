@@ -76,7 +76,9 @@ export function getServiceBadgeStyle(serviceName: string) {
   return {
     bg: badge.bg,
     fg: badge.fg,
-    label: ` ${cleanLabel} `
+    label: ` ${cleanLabel} `,
+    cleanLabel,
+    color: badge.bg
   };
 }
 

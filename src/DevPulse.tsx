@@ -18,11 +18,12 @@ import { DevPulseConfig } from './types/config.js';
 export interface DevPulseProps {
   config?: DevPulseConfig;
   onOpenConfig?: () => void;
+  onSwitchConfig?: () => void;
   width?: number;
   height?: number;
 }
 
-export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, width, height }) => {
+export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwitchConfig, width, height }) => {
   const { exit } = useApp();
   const [state, dispatch] = useReducer(dashboardReducer, config, createInitialDashboardState);
   const viewport = useTerminalViewport(width, height);
@@ -43,8 +44,16 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, width,
     exit,
     clickManagerRef,
     onRestart: handleRestart,
-    onToggleStop: handleToggleStop
+    onToggleStop: handleToggleStop,
+    onSwitchConfig
   });
+
+  // Assert clean SGR mouse reporting mode on mount
+  useEffect(() => {
+    try {
+      process.stdout.write('\x1b[?1000h\x1b[?1006h');
+    } catch {}
+  }, []);
 
   // Time updater
   useEffect(() => {
@@ -219,6 +228,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, width,
           activePanel={state.activePanel} 
           width={viewport.width} 
           onToggleHelp={() => dispatch({ type: 'TOGGLE_HELP', show: !state.showHelp })}
+          onSwitchConfig={onSwitchConfig}
         />
 
         {/* 4. Optional Help Overlay Modal */}

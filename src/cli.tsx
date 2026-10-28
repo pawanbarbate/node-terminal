@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { render } from 'ink';
 import DevPulse from './DevPulse.js';
 import SetupWizard from './components/wizard/SetupWizard.js';
-import { loadConfigFile, hasConfigFile } from './services/configManager.js';
+import ConfigSelectorScreen from './components/selector/ConfigSelectorScreen.js';
+import { loadConfigFile, hasConfigFile, getConfigFilePath, parseCliArgs, getConfigFileSummaries, ConfigFileSummary } from './services/configManager.js';
 import { processManager } from './services/processManager.js';
 import { DevPulseConfig } from './types/config.js';
 import { theme } from './theme/theme.js';
@@ -34,25 +35,112 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
+const cliArgs = parseCliArgs();
+if (cliArgs.configPath && !hasConfigFile(cliArgs.configPath)) {
+  cleanup();
+  console.error(`\x1b[31mError: Specified configuration file not found: ${cliArgs.configPath}\x1b[0m`);
+  process.exit(1);
+}
+
 const App: React.FC = () => {
-  const [config, setConfig] = useState<DevPulseConfig | null>(() => loadConfigFile());
-  const [mode, setMode] = useState<'dashboard' | 'wizard'>(() =>
-    hasConfigFile() && config ? 'dashboard' : 'wizard'
+  const [summaries, setSummaries] = useState<ConfigFileSummary[]>(() =>
+    !cliArgs.configPath ? getConfigFileSummaries(process.cwd()) : []
   );
 
+  const [activeConfigPath, setActiveConfigPath] = useState<string | null>(() => {
+    if (cliArgs.configPath) {
+      return getConfigFilePath(cliArgs.configPath);
+    }
+    const currentSummaries = getConfigFileSummaries(process.cwd());
+    if (currentSummaries.length === 1 && currentSummaries[0]) {
+      return currentSummaries[0].path;
+    }
+    return null;
+  });
+
+  const [config, setConfig] = useState<DevPulseConfig | null>(() => {
+    if (cliArgs.configPath) {
+      return loadConfigFile(cliArgs.configPath);
+    }
+    const currentSummaries = getConfigFileSummaries(process.cwd());
+    if (currentSummaries.length === 1 && currentSummaries[0]) {
+      return loadConfigFile(currentSummaries[0].path);
+    }
+    return null;
+  });
+
+  const [mode, setMode] = useState<'dashboard' | 'wizard' | 'selector'>(() => {
+    if (cliArgs.configPath) {
+      return hasConfigFile(cliArgs.configPath) ? 'dashboard' : 'wizard';
+    }
+    const currentSummaries = getConfigFileSummaries(process.cwd());
+    if (currentSummaries.length > 1) {
+      return 'selector';
+    }
+    if (currentSummaries.length === 1 && currentSummaries[0]) {
+      const singleConfig = loadConfigFile(currentSummaries[0].path);
+      if (singleConfig) return 'dashboard';
+    }
+    return 'wizard';
+  });
+
+  const handleSelectProfile = (chosenPath: string) => {
+    const loaded = loadConfigFile(chosenPath);
+    if (loaded) {
+      setActiveConfigPath(chosenPath);
+      setConfig(loaded);
+      setMode('dashboard');
+    }
+  };
+
+  const handleSwitchConfig = () => {
+    // Terminate any running child service processes cleanly before switching
+    try {
+      processManager.stopAllSync();
+    } catch {}
+
+    const freshSummaries = getConfigFileSummaries(process.cwd());
+    setSummaries(freshSummaries);
+    if (freshSummaries.length > 1) {
+      setMode('selector');
+    } else {
+      setMode('wizard');
+    }
+  };
 
   const handleWizardComplete = (newConfig: DevPulseConfig) => {
     setConfig(newConfig);
+    const refreshed = getConfigFilePath(process.cwd());
+    if (refreshed) setActiveConfigPath(refreshed);
     setMode('dashboard');
   };
+
+  if (mode === 'selector') {
+    return (
+      <ConfigSelectorScreen
+        configs={summaries}
+        onSelect={handleSelectProfile}
+        onNewConfig={() => setMode('wizard')}
+        onCancel={() => {
+          cleanup();
+          process.exit(0);
+        }}
+      />
+    );
+  }
 
   if (mode === 'wizard') {
     return (
       <SetupWizard 
         onComplete={handleWizardComplete} 
+        configFilePath={activeConfigPath || undefined}
         onCancel={() => {
-          cleanup();
-          process.exit(0);
+          if (summaries.length > 1) {
+            setMode('selector');
+          } else {
+            cleanup();
+            process.exit(0);
+          }
         }}
       />
     );
@@ -62,6 +150,7 @@ const App: React.FC = () => {
     <DevPulse 
       config={config || undefined} 
       onOpenConfig={() => setMode('wizard')}
+      onSwitchConfig={handleSwitchConfig}
     />
   );
 };
