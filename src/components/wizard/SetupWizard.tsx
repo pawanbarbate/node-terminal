@@ -324,6 +324,20 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         if (baseButton === 0 && isPress) {
           // Dynamic click routing via ClickManager! Zero manual coordinate math!
           clickManagerRef.current?.dispatchClick(mouseX, mouseY);
+        } else if (baseButton === 64 && services.length > 0) {
+          // Mouse Wheel UP -> Scroll upward in services registry
+          const nextIdx = Math.max(0, selectedIndex - 1);
+          setSelectedIndex(nextIdx);
+          setIsEditingNew(false);
+          loadServiceToForm(services[nextIdx]!);
+          setActivePanel('services');
+        } else if (baseButton === 65 && services.length > 0) {
+          // Mouse Wheel DOWN -> Scroll downward in services registry
+          const nextIdx = Math.min(services.length - 1, selectedIndex + 1);
+          setSelectedIndex(nextIdx);
+          setIsEditingNew(false);
+          loadServiceToForm(services[nextIdx]!);
+          setActivePanel('services');
         }
       }
 
