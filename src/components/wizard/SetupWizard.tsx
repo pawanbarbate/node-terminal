@@ -26,8 +26,8 @@ export const ARCHITECTURE_PRESETS: ArchitecturePreset[] = [
     label: 'Next.js + Express API',
     description: 'Next.js frontend with backend Express API service',
     services: [
-      { name: 'frontend', path: './apps/web', command: 'npm run dev', port: 3000, autoStart: true },
-      { name: 'api', path: './services/api', command: 'npm run dev', port: 4000, autoStart: true }
+      { name: 'api', path: './services/api', command: 'npm run dev', port: 4000, autoStart: true },
+      { name: 'frontend', path: './apps/web', command: 'npm run dev', port: 3000, autoStart: true, dependsOn: ['api'] }
     ]
   },
   {
@@ -35,8 +35,8 @@ export const ARCHITECTURE_PRESETS: ArchitecturePreset[] = [
     label: 'React (Vite) + FastAPI',
     description: 'Vite frontend with Python FastAPI backend and reload',
     services: [
-      { name: 'web-client', path: './frontend', command: 'npm run dev', port: 5173, autoStart: true },
-      { name: 'api-server', path: './backend', command: 'python -m uvicorn main:app --reload', port: 8000, autoStart: true }
+      { name: 'backend', path: './backend', command: 'python -m uvicorn main:app --reload', port: 8000, autoStart: true },
+      { name: 'web-client', path: './frontend', command: 'npm run dev', port: 5173, autoStart: true, dependsOn: ['backend'] }
     ]
   },
   {
@@ -44,14 +44,23 @@ export const ARCHITECTURE_PRESETS: ArchitecturePreset[] = [
     label: 'Monorepo (Web, API, Worker)',
     description: '3-tier fullstack stack with background processing worker',
     services: [
-      { name: 'web', path: './apps/web', command: 'pnpm dev', port: 3000, autoStart: true },
-      { name: 'api', path: './services/api', command: 'pnpm dev', port: 4000, autoStart: true },
-      { name: 'worker', path: './services/worker', command: 'pnpm start', port: undefined, autoStart: true }
+      { name: 'api', path: './services/api', command: 'pnpm dev', port: 4000, autoStart: true, preStart: ['npm run migrate'] },
+      { name: 'web', path: './apps/web', command: 'pnpm dev', port: 3000, autoStart: true, dependsOn: ['api'] },
+      { name: 'worker', path: './services/worker', command: 'pnpm start', port: undefined, autoStart: true, dependsOn: ['api'] }
     ]
   }
 ];
 
-const FORM_FIELDS: WizardFormField[] = ['name', 'path', 'command', 'port', 'autoStart', 'saveBtn'];
+const FORM_FIELDS: WizardFormField[] = [
+  'name', 
+  'path', 
+  'command', 
+  'port', 
+  'autoStart', 
+  'dependsOn', 
+  'preStart', 
+  'saveBtn'
+];
 
 export const SetupWizard: React.FC<SetupWizardProps> = ({
   onComplete,
@@ -112,6 +121,14 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   });
   const [port, setPort] = useState(() => (detected.length > 0 && services[0]?.port ? String(services[0].port) : ''));
   const [autoStart, setAutoStart] = useState<boolean>(() => (detected.length > 0 ? services[0]?.autoStart ?? true : true));
+  const [dependsOnStr, setDependsOnStr] = useState<string>(() => {
+    const firstSvc = detected.length > 0 ? services[0] : undefined;
+    return Array.isArray(firstSvc?.dependsOn) ? firstSvc.dependsOn.join(', ') : '';
+  });
+  const [preStartStr, setPreStartStr] = useState<string>(() => {
+    const firstSvc = detected.length > 0 ? services[0] : undefined;
+    return Array.isArray(firstSvc?.preStart) ? firstSvc.preStart.join(' && ') : '';
+  });
   const [focusedField, setFocusedField] = useState<WizardFormField>('name');
   const [error, setError] = useState<string | null>(null);
 
@@ -122,6 +139,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     setCommand(Array.isArray(svc.command) ? svc.command.join(' && ') : (svc.command || ''));
     setPort(svc.port ? String(svc.port) : '');
     setAutoStart(svc.autoStart !== false);
+    setDependsOnStr(Array.isArray(svc.dependsOn) ? svc.dependsOn.join(', ') : '');
+    setPreStartStr(Array.isArray(svc.preStart) ? svc.preStart.join(' && ') : '');
     setError(null);
   }, []);
 
@@ -135,6 +154,15 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     setError(null);
   }, [loadServiceToForm]);
 
+  // Quick-add a dependency to dependsOn string
+  const handleAddDependency = useCallback((depName: string) => {
+    setDependsOnStr(prev => {
+      const parts = prev.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      if (parts.includes(depName.toLowerCase())) return prev;
+      return parts.length > 0 ? `${prev.trim()}, ${depName}` : depName;
+    });
+  }, []);
+
   // Reset form to blank for registering a new service
   const handleStartAddService = useCallback(() => {
     setIsEditingNew(true);
@@ -143,6 +171,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     setCommand('npm run dev');
     setPort('');
     setAutoStart(true);
+    setDependsOnStr('');
+    setPreStartStr('');
     setFocusedField('name');
     setActivePanel('form');
     setNarrowTab('form');
@@ -193,12 +223,24 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       return;
     }
 
+    const parsedDeps = dependsOnStr.trim()
+      ? dependsOnStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : undefined;
+
+    const parsedPre = preStartStr.trim()
+      ? (preStartStr.includes('&&')
+          ? preStartStr.split('&&').map(s => s.trim()).filter(Boolean)
+          : [preStartStr.trim()])
+      : undefined;
+
     const savedService: ServiceConfig = {
       name: name.trim(),
       path: pathValue.trim(),
       command: command.trim(),
       port: parsedPort,
-      autoStart
+      autoStart,
+      dependsOn: parsedDeps,
+      preStart: parsedPre
     };
 
     if (isEditingNew) {
@@ -211,7 +253,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
     setError(null);
     setActivePanel('services');
-  }, [name, pathValue, command, port, autoStart, isEditingNew, selectedIndex, services.length]);
+  }, [name, pathValue, command, port, autoStart, dependsOnStr, preStartStr, isEditingNew, selectedIndex, services.length]);
 
   // Save devpulse.config.json and launch DevPulse dashboard
   const handleSaveAndLaunch = useCallback(() => {
@@ -420,6 +462,12 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       } else if (focusedField === 'port') {
         if (key.backspace || key.delete) setPort(prev => prev.slice(0, -1));
         else if (/^\d$/.test(input)) setPort(prev => prev + input);
+      } else if (focusedField === 'dependsOn') {
+        if (key.backspace || key.delete) setDependsOnStr(prev => prev.slice(0, -1));
+        else if (input && !key.ctrl && !key.meta) setDependsOnStr(prev => prev + input);
+      } else if (focusedField === 'preStart') {
+        if (key.backspace || key.delete) setPreStartStr(prev => prev.slice(0, -1));
+        else if (input && !key.ctrl && !key.meta) setPreStartStr(prev => prev + input);
       }
     }
   });
@@ -496,6 +544,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
                 command={command}
                 port={port}
                 autoStart={autoStart}
+                dependsOnStr={dependsOnStr}
+                preStartStr={preStartStr}
+                availableServices={services.map(s => s.name).filter(n => n.toLowerCase() !== name.toLowerCase())}
                 focusedField={focusedField}
                 isFocused={true}
                 error={error}
@@ -512,6 +563,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
                   setAutoStart(prev => !prev);
                   setActivePanel('form');
                 }}
+                onAddDependency={handleAddDependency}
                 onApplySuggestion={handleApplySuggestion}
                 onSubmit={handleFormSubmit}
                 onClear={handleStartAddService}
@@ -557,6 +609,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
                 command={command}
                 port={port}
                 autoStart={autoStart}
+                dependsOnStr={dependsOnStr}
+                preStartStr={preStartStr}
+                availableServices={services.map(s => s.name).filter(n => n.toLowerCase() !== name.toLowerCase())}
                 focusedField={focusedField}
                 isFocused={activePanel === 'form'}
                 error={error}
@@ -572,6 +627,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
                   setAutoStart(prev => !prev);
                   setActivePanel('form');
                 }}
+                onAddDependency={handleAddDependency}
                 onApplySuggestion={handleApplySuggestion}
                 onSubmit={handleFormSubmit}
                 onClear={handleStartAddService}

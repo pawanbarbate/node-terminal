@@ -173,16 +173,23 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
                     </Box>
                   </Box>
 
-                  {/* Row 2: Subtitle Path & Execution Command */}
+                  {/* Row 2: Subtitle Path, Dependencies & Execution Command */}
                   <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
-                    <Box flexShrink={1} flexGrow={0}>
+                    <Box flexDirection="row" alignItems="center" flexShrink={1}>
                       <Text color={theme.colors.textDim} wrap="truncate-end">
                         {svc.path}
                       </Text>
+                      {svc.dependsOn && svc.dependsOn.length > 0 ? (
+                        <Box backgroundColor={theme.colors.card} paddingX={1} marginLeft={1} flexShrink={0}>
+                          <Text color={theme.colors.accent}>
+                            needs: {svc.dependsOn.join(',')}
+                          </Text>
+                        </Box>
+                      ) : null}
                     </Box>
                     <Box flexShrink={0} marginLeft={1}>
                       <Text color={isSelected ? theme.colors.textSecondary : theme.colors.textMuted} wrap="truncate-end">
-                        {'↓ '}{svc.command}
+                        {'↓ '}{Array.isArray(svc.command) ? svc.command.join(' && ') : (svc.command || '')}
                       </Text>
                     </Box>
                   </Box>
