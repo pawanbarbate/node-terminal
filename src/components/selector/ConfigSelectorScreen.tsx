@@ -149,17 +149,16 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
             paddingY={0}
           >
             {/* Title Section with Hairline Divider */}
-            <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={0} marginBottom={0} flexWrap="nowrap">
-              <Box flexDirection="row" alignItems="center" flexShrink={0}>
-                <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1} flexShrink={0}>
-                  <Text color={theme.colors.accent} bold>⚡ MULTIPLE CONFIGURATIONS DETECTED</Text>
-                </Box>
+            <Box width="100%" flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={0} marginBottom={0} flexWrap="nowrap">
+              <Box flexDirection="row" alignItems="center" flexShrink={1}>
+                <Text color={theme.colors.accent} bold>⚡ MULTIPLE CONFIGURATIONS DETECTED</Text>
+                <Text color={theme.colors.textDim}> │ </Text>
                 <Text color={theme.colors.textSecondary}>
-                  Found <Text color={theme.colors.textPrimary} bold>{configs.length}</Text> configuration environments
+                  Found <Text color={theme.colors.textPrimary} bold>{configs.length}</Text> profiles
                 </Text>
               </Box>
-              <Box flexShrink={0}>
-                <Text color={theme.colors.textDim}>[↑↓ / 1-9 to pick]</Text>
+              <Box flexShrink={0} marginLeft={2}>
+                <Text color={theme.colors.textMuted}>[↑↓ / 1-9 to pick]</Text>
               </Box>
             </Box>
 
@@ -187,89 +186,79 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
                       width="100%"
                       flexDirection="column"
                       borderStyle="round"
-                      borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderSubtle}
-                      backgroundColor={isSelected ? theme.colors.cardHover : theme.colors.card}
+                      borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
+                      backgroundColor={isSelected ? theme.colors.card : theme.colors.surface}
                       paddingX={1}
                       paddingY={0}
                       marginBottom={1}
                     >
-                      {/* Top Line: Quick Key, Filename, Project Tag, Services Badge */}
+                      {/* Top Line: Indicator, Shortcut, Filename, Services Count */}
                       <Box width="100%" flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
                         <Box flexDirection="row" alignItems="center" flexShrink={1}>
-                          <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
-                            {isSelected ? '▶ ' : '  '}
+                          <Text color={isSelected ? theme.colors.accent : theme.colors.textDim} bold={isSelected}>
+                            {isSelected ? '▎ ' : '  '}
                           </Text>
 
                           {quickKey && (
-                            <Box
-                              backgroundColor={isSelected ? theme.colors.accent : theme.colors.surface}
-                              paddingX={1}
-                              marginRight={1}
-                              flexShrink={0}
-                            >
-                              <Text color={isSelected ? theme.colors.canvas : theme.colors.textSecondary} bold>
-                                [{quickKey}]
-                              </Text>
-                            </Box>
+                            <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
+                              [{quickKey}]{' '}
+                            </Text>
                           )}
 
-                          <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold wrap="truncate-end">
+                          <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
                             {cfg.filename}
                           </Text>
 
-                          {cfg.name ? (
-                            <Box backgroundColor={theme.colors.surface} paddingX={1} marginLeft={1} flexShrink={1}>
-                              <Text color={theme.colors.textDim}>[ </Text>
-                              <Text color={theme.colors.accent} wrap="truncate-end">{cfg.name}</Text>
-                              <Text color={theme.colors.textDim}> ]</Text>
-                            </Box>
+                          {cfg.name && cfg.name !== 'services' && cfg.name !== cfg.filename.replace(/\.devpulse\.json$/, '') ? (
+                            <Text color={theme.colors.textDim}> · {cfg.name}</Text>
                           ) : null}
                         </Box>
 
-                        <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
+                        <Box flexShrink={0} marginLeft={2}>
                           {cfg.isValid ? (
-                            <Box backgroundColor={theme.colors.runningBg} paddingX={1} flexShrink={0}>
-                              <Text color={theme.colors.running} bold>
-                                [ {cfg.servicesCount} {cfg.servicesCount === 1 ? 'Service' : 'Services'} ]
-                              </Text>
-                            </Box>
+                            <Text color={isSelected ? theme.colors.running : theme.colors.textMuted} bold={isSelected}>
+                              ● {cfg.servicesCount} {cfg.servicesCount === 1 ? 'service' : 'services'}
+                            </Text>
                           ) : (
-                            <Box backgroundColor={theme.colors.stoppedBg} paddingX={1} flexShrink={0}>
-                              <Text color={theme.colors.stopped} bold>
-                                [ ✖ Invalid JSON ]
-                              </Text>
-                            </Box>
+                            <Text color={theme.colors.stopped} bold>
+                              ✖ Invalid configuration
+                            </Text>
                           )}
                         </Box>
                       </Box>
 
-                      {/* Bottom Line: Structured Discrete Service Pills */}
+                      {/* Bottom Line: Included Services & Ports (Clean dot-separated list) */}
                       {cfg.isValid && cfg.services.length > 0 && (
-                        <Box width="100%" flexDirection="row" alignItems="center" marginTop={0} paddingLeft={2} flexWrap="nowrap">
-                          <Text color={theme.colors.textMuted}>Includes: </Text>
-                          {cfg.services.slice(0, 5).map((svc, sIdx) => (
-                            <Box
-                              key={sIdx}
-                              backgroundColor={theme.colors.surface}
-                              paddingX={1}
-                              marginRight={1}
-                              flexShrink={0}
-                            >
-                              <Text color={theme.colors.textPrimary}>{svc.name}</Text>
-                              {svc.port ? <Text color={theme.colors.accent}>:{svc.port}</Text> : null}
-                            </Box>
-                          ))}
-                          {cfg.services.length > 5 && (
-                            <Box backgroundColor={theme.colors.surface} paddingX={1} flexShrink={0}>
+                        <Box width="100%" flexDirection="row" alignItems="center" marginTop={0} flexWrap="nowrap">
+                          <Text color={theme.colors.textDim}>    Services: </Text>
+                          <Box flexDirection="row" alignItems="center" flexShrink={1} flexWrap="nowrap">
+                            {cfg.services.slice(0, 5).map((svc, sIdx) => (
+                              <Box key={sIdx} marginRight={1} flexShrink={0}>
+                                <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary}>
+                                  {svc.name}
+                                </Text>
+                                {svc.port ? <Text color={theme.colors.accent}>:{svc.port}</Text> : null}
+                                {sIdx < Math.min(cfg.services.length, 5) - 1 ? (
+                                  <Text color={theme.colors.textDim}> ·</Text>
+                                ) : null}
+                              </Box>
+                            ))}
+                            {cfg.services.length > 5 && (
                               <Text color={theme.colors.textDim}>+{cfg.services.length - 5} more</Text>
-                            </Box>
-                          )}
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {cfg.isValid && cfg.services.length === 0 && (
+                        <Box width="100%" marginTop={0}>
+                          <Text color={theme.colors.textDim}>    No services configured</Text>
                         </Box>
                       )}
 
                       {cfg.error && (
-                        <Box paddingLeft={2} marginTop={0}>
-                          <Text color={theme.colors.stopped}>{cfg.error}</Text>
+                        <Box width="100%" marginTop={0}>
+                          <Text color={theme.colors.stopped}>    {cfg.error}</Text>
                         </Box>
                       )}
                     </Box>
@@ -318,17 +307,10 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
           backgroundColor={theme.colors.canvas}
         >
           <Box flexDirection="row" alignItems="center" flexWrap="nowrap">
-            <Text color={theme.colors.accent} bold>[↑↓/Click]</Text>
-            <Text color={theme.colors.textMuted}> Select </Text>
-
-            <Text color={theme.colors.textPrimary} bold>[Enter/1-9]</Text>
-            <Text color={theme.colors.textMuted}> Launch </Text>
-
-            <Text color={theme.colors.textPrimary} bold>[w]</Text>
-            <Text color={theme.colors.textMuted}> New Profile </Text>
-
-            <Text color={theme.colors.textDim} bold>[Esc]</Text>
-            <Text color={theme.colors.textMuted}> Exit</Text>
+            <Box marginRight={2}><Text color={theme.colors.accent} bold>[↑↓/Click]</Text><Text color={theme.colors.textMuted}> Select</Text></Box>
+            <Box marginRight={2}><Text color={theme.colors.textPrimary} bold>[Enter/1-9]</Text><Text color={theme.colors.textMuted}> Launch</Text></Box>
+            <Box marginRight={2}><Text color={theme.colors.textPrimary} bold>[w]</Text><Text color={theme.colors.textMuted}> New Profile</Text></Box>
+            <Box marginRight={2}><Text color={theme.colors.textDim} bold>[Esc]</Text><Text color={theme.colors.textMuted}> Exit</Text></Box>
           </Box>
 
           <Box flexDirection="row" alignItems="center">
