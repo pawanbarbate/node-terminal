@@ -8,14 +8,14 @@ export const theme = {
     // Canvas & Surfaces (Refined Midnight Slate Palette)
     canvas: '#0B0F19',          // Deep midnight canvas (RGB: 11, 15, 25)
     surface: '#0F172A',         // Rich slate 900 panel container
-    card: '#1E293B',            // Elevated slate 800 card / active item surface
-    cardHover: '#26334B',       // Selection / hover highlight
-    cardSelected: '#1E293B',     // Selected service row background
+    card: '#131F31',            // Deep ink card surface
+    cardHover: '#14283A',       // Subtle blue-ink focus surface
+    cardSelected: '#14283A',    // Selected service row background
 
     // Borders & Dividers
-    borderDefault: '#1E293B',   // Crisp, high-contrast slate border
+    borderDefault: '#25344A',   // Muted blue-slate panel outline
     borderFocus: '#38BDF8',     // Sky blue focus border (high clarity, calm)
-    borderSubtle: '#172033',    // Internal micro-dividers
+    borderSubtle: '#1B293B',    // Low-contrast ink-blue dividers
 
     // Typography Hierarchy (WCAG AAA contrast against #0F172A & #0B0F19)
     textPrimary: '#FFFFFF',     // Pure crisp white for active titles, service names
