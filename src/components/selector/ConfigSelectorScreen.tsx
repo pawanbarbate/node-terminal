@@ -66,6 +66,13 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
   }, []);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const selectedIndexRef = useRef(0);
+
+  const updateSelection = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(configs.length - 1, index));
+    selectedIndexRef.current = nextIndex;
+    setSelectedIndex(nextIndex);
+  };
 
   // Keyboard navigation & SGR mouse handling
   useInput((input, key) => {
@@ -100,7 +107,7 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
 
       if (handledMouse) {
         if (wheelDelta !== 0 && configs.length > 0) {
-          setSelectedIndex(prev => Math.min(configs.length - 1, Math.max(0, prev + wheelDelta)));
+          updateSelection(selectedIndexRef.current + wheelDelta);
         }
         return;
       }
@@ -112,22 +119,36 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
       return;
     }
 
-    // 3. Arrow Up / k
-    if (key.upArrow || input === 'k') {
-      setSelectedIndex(prev => Math.max(0, prev - 1));
-      return;
-    }
+    // Keep keyboard movement aligned with the visual grid, including a partial last row.
+    if (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow ||
+      input === 'h' || input === 'l' || input === 'k' || input === 'j') {
+      if (configs.length === 0) return;
 
-    // 4. Arrow Down / j
-    if (key.downArrow || input === 'j') {
-      setSelectedIndex(prev => Math.min(configs.length - 1, prev + 1));
+      const currentIndex = selectedIndexRef.current;
+      const currentColumn = currentIndex % columns;
+      const currentRow = Math.floor(currentIndex / columns);
+      let nextIndex = currentIndex;
+
+      if (key.leftArrow || input === 'h') {
+        if (currentColumn > 0) nextIndex--;
+      } else if (key.rightArrow || input === 'l') {
+        if (currentColumn < columns - 1 && currentIndex + 1 < configs.length) nextIndex++;
+      } else {
+        const rowDelta = key.upArrow || input === 'k' ? -1 : 1;
+        const targetRow = Math.max(0, Math.min(Math.ceil(configs.length / columns) - 1, currentRow + rowDelta));
+        const targetRowStart = targetRow * columns;
+        const targetRowLength = Math.min(columns, configs.length - targetRowStart);
+        nextIndex = targetRowStart + Math.min(currentColumn, targetRowLength - 1);
+      }
+
+      updateSelection(nextIndex);
       return;
     }
 
     // 5. Enter / Space: Select focused config
     if (key.return || input === ' ') {
-      if (configs[selectedIndex]) {
-        onSelect(configs[selectedIndex]!.path);
+      if (configs[selectedIndexRef.current]) {
+        onSelect(configs[selectedIndexRef.current]!.path);
       }
       return;
     }
@@ -149,25 +170,17 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
   });
 
   const contentHeight = Math.max(14, viewport.height - 3);
-  const containerWidth = Math.min(Math.max(68, viewport.width - 6), 90);
+  const containerWidth = Math.min(90, Math.max(40, viewport.width - 6));
   const innerWidth = Math.max(20, containerWidth - 6);
+  const columns = innerWidth >= 76 ? 2 : 1;
+  const columnWidth = Math.floor((innerWidth - (columns - 1) * 2) / columns);
 
-  // ---------------------------------------------------------------
-  // Vertical windowing: keep the profile list inside the screen
-  // Chrome rows (padding 1 + borders 2 + title 1 + dividers 3 + actions 4) = 11
-  // ---------------------------------------------------------------
   const listBudget = Math.max(4, contentHeight - 11);
-  const MAX_SELECTED_SERVICE_LINES = 4;
+  const MAX_SELECTED_SERVICE_LINES = 3;
   const INDICATOR_RESERVE = 2; // rows for "▲ above" / "▼ below"
-
-  // Service lines the selected card can afford: base card is 4 rows,
-  // so remaining rows (after indicator reserve) go to service lines.
-  const fitServiceLines = Math.max(0, Math.min(MAX_SELECTED_SERVICE_LINES, listBudget - 4 - INDICATOR_RESERVE));
-
-  // Wrapped service lines for the selected profile (all services, hard cap 4 lines)
+  const fitServiceLines = Math.max(0, Math.min(MAX_SELECTED_SERVICE_LINES, listBudget - 8 - INDICATOR_RESERVE));
   const selectedCfg = configs[selectedIndex];
-  // Reserve room so a trailing "+N more" never overflows the card width
-  const serviceLineBudget = Math.max(12, innerWidth - 26);
+  const serviceLineBudget = Math.max(12, columnWidth - 8);
   const selectedServiceLines: SummaryService[][] = selectedCfg && selectedCfg.isValid
     ? chunkServiceLines(selectedCfg.services, serviceLineBudget)
     : [];
@@ -177,32 +190,42 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
     hiddenServiceCount += selectedServiceLines[i]?.length ?? 0;
   }
 
-  // Row cost of each card: 2 borders + 1 margin + content rows
+  // Each card has a title and summary row, plus borders and its bottom margin.
   const cardRows = (idx: number): number => {
     const cfg = configs[idx];
-    if (!cfg) return 4;
-    if (cfg.error) return 5; // top line + error line
+    if (!cfg) return 5;
+    if (cfg.error) return 7;
     if (idx === selectedIndex) {
-      if (cfg.services.length === 0) return 4; // top line + "No services"
-      return 4 + visibleServiceLines.length;
+      if (cfg.services.length === 0) return 7;
+      if (visibleServiceLines.length === 0) return 5;
+      return 7 + visibleServiceLines.length + (hiddenServiceCount > 0 ? 1 : 0);
     }
-    return 4; // top line only (services shown on selected card)
+    return 5;
   };
 
-  // Greedy packing around selectedIndex: grow window until budget is spent
+  const rowCount = Math.ceil(configs.length / columns);
+  const selectedRow = Math.floor(selectedIndex / columns);
+  const gridRowHeight = (row: number): number => {
+    const first = row * columns;
+    return Math.max(...Array.from(
+      { length: Math.min(columns, configs.length - first) },
+      (_, column) => cardRows(first + column)
+    ));
+  };
+
   const packWindow = (budget: number): { start: number; end: number; used: number } => {
-    let start = configs.length > 0 ? selectedIndex : 0;
-    let end = configs.length > 0 ? selectedIndex + 1 : 0;
-    let used = configs.length > 0 ? cardRows(selectedIndex) : 0;
+    let start = rowCount > 0 ? selectedRow : 0;
+    let end = rowCount > 0 ? selectedRow + 1 : 0;
+    let used = rowCount > 0 ? gridRowHeight(selectedRow) : 0;
     for (;;) {
       let grew = false;
-      if (end < configs.length && used + cardRows(end) <= budget) {
-        used += cardRows(end);
+      if (end < rowCount && used + gridRowHeight(end) <= budget) {
+        used += gridRowHeight(end);
         end++;
         grew = true;
       }
-      if (start > 0 && used + cardRows(start - 1) <= budget) {
-        used += cardRows(start - 1);
+      if (start > 0 && used + gridRowHeight(start - 1) <= budget) {
+        used += gridRowHeight(start - 1);
         start--;
         grew = true;
       }
@@ -211,18 +234,16 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
     return { start, end, used };
   };
 
-  // Always afford at least the selected card itself, then reserve indicator rows
-  const initialBudget = Math.max(cardRows(selectedIndex), listBudget - INDICATOR_RESERVE);
+  const initialBudget = Math.max(gridRowHeight(selectedRow), listBudget - INDICATOR_RESERVE);
   let packed = packWindow(initialBudget);
-  // Second pass: if fewer indicators are actually needed, reclaim their rows
   const actualReserve =
-    (packed.start > 0 ? 1 : 0) + (packed.end < configs.length ? 1 : 0);
+    (packed.start > 0 ? 1 : 0) + (packed.end < rowCount ? 1 : 0);
   if (actualReserve < INDICATOR_RESERVE) {
-    const retry = packWindow(Math.max(cardRows(selectedIndex), listBudget - actualReserve));
+    const retry = packWindow(Math.max(gridRowHeight(selectedRow), listBudget - actualReserve));
     if (retry.end - retry.start > packed.end - packed.start) packed = retry;
   }
-  const windowStart = packed.start;
-  const windowEnd = packed.end;
+  const windowStart = packed.start * columns;
+  const windowEnd = Math.min(configs.length, packed.end * columns);
   const visibleConfigs = configs.slice(windowStart, windowEnd);
   const hiddenAbove = windowStart;
   const hiddenBelow = configs.length - windowEnd;
@@ -256,18 +277,20 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
             paddingX={2}
             paddingY={0}
           >
-            {/* Title Section with Hairline Divider */}
-            <Box width="100%" flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={0} marginBottom={0} flexWrap="nowrap">
-              <Box flexDirection="row" alignItems="center" flexShrink={1}>
-                <Text color={theme.colors.accent} bold>⚡ MULTIPLE CONFIGURATIONS DETECTED</Text>
-                <Text color={theme.colors.textDim}> │ </Text>
-                <Text color={theme.colors.textSecondary}>
-                  Found <Text color={theme.colors.textPrimary} bold>{configs.length}</Text> profiles
+            {/* Title Section */}
+            <Box width="100%" flexDirection="column" marginBottom={1}>
+              <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+                <Text color={theme.colors.accent} bold>
+                  {containerWidth >= 76 ? '⚡ MULTIPLE CONFIGURATIONS DETECTED' : '⚡ SELECT A PROFILE'}
                 </Text>
+                {containerWidth >= 76 && (
+                  <Text color={theme.colors.textMuted}>←↑↓→ navigate · Enter launch</Text>
+                )}
               </Box>
-              <Box flexShrink={0} marginLeft={2}>
-                <Text color={theme.colors.textMuted}>[↑↓ / 1-9 to pick]</Text>
-              </Box>
+              <Text color={theme.colors.textSecondary}>
+                <Text color={theme.colors.textPrimary} bold>{configs.length}</Text>
+                {' '}{configs.length === 1 ? 'profile' : 'profiles'} available
+              </Text>
             </Box>
 
             {/* Hairline Divider under Header */}
@@ -285,17 +308,22 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
                 </Box>
               )}
 
-              {visibleConfigs.map((cfg, vIdx) => {
-                const idx = windowStart + vIdx;
+              {Array.from({ length: Math.ceil(visibleConfigs.length / columns) }, (_, row) => (
+                <Box key={`config-row-${row}`} flexDirection="row" width="100%">
+                  {visibleConfigs.slice(row * columns, (row + 1) * columns).map((cfg, column) => {
+                const idx = windowStart + row * columns + column;
                 const isSelected = selectedIndex === idx;
                 const quickKey = idx < 9 ? String(idx + 1) : null;
+                const showConfigName = columns === 1 && innerWidth >= 50;
 
                 return (
                   <Clickable
                     key={cfg.path}
                     id={`config-card-${idx}`}
+                    width={`${100 / columns}%`}
+                    paddingRight={columns === 2 && column === 0 ? 1 : 0}
                     onClick={() => {
-                      setSelectedIndex(idx);
+                      updateSelection(idx);
                       onSelect(cfg.path);
                     }}
                   >
@@ -304,89 +332,79 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
                       flexDirection="column"
                       borderStyle="round"
                       borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                      backgroundColor={isSelected ? theme.colors.cardSelected : theme.colors.card}
                       paddingX={1}
                       paddingY={0}
                       marginBottom={1}
                     >
-                      {/* Top Line: Indicator, Shortcut, Filename, Services Count */}
-                      <Box width="100%" flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
-                        <Box flexDirection="row" alignItems="center" flexShrink={1}>
-                          <Text color={isSelected ? theme.colors.accent : theme.colors.textDim} bold={isSelected}>
-                            {isSelected ? '▎ ' : '  '}
+                      <Box width="100%" flexDirection="row" alignItems="center" flexWrap="nowrap">
+                        <Text color={isSelected ? theme.colors.accent : theme.colors.textDim} bold={isSelected}>
+                          {isSelected ? '◆ ' : '◇ '}
+                        </Text>
+                        {quickKey && (
+                          <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
+                            [{quickKey}]{' '}
                           </Text>
-
-                          {quickKey && (
-                            <Text color={isSelected ? theme.colors.accent : theme.colors.textMuted} bold={isSelected}>
-                              [{quickKey}]{' '}
-                            </Text>
-                          )}
-
-                          <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textMuted} bold={isSelected} wrap="truncate-end">
-                            {cfg.filename}
-                          </Text>
-
-                          {cfg.name && cfg.name !== 'services' && cfg.name !== cfg.filename.replace(/\.devpulse\.json$/, '') ? (
-                            <Text color={theme.colors.textDim}> · {cfg.name}</Text>
-                          ) : null}
-                        </Box>
-
-                        <Box flexShrink={0} marginLeft={2}>
-                          {cfg.isValid ? (
-                            <Text color={isSelected ? theme.colors.running : theme.colors.textMuted} bold={isSelected}>
-                              ● {cfg.servicesCount} {cfg.servicesCount === 1 ? 'service' : 'services'}
-                            </Text>
-                          ) : (
-                            <Text color={theme.colors.stopped} bold>
-                              ✖ Invalid configuration
-                            </Text>
-                          )}
-                        </Box>
+                        )}
+                        <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
+                          {cfg.filename}
+                        </Text>
                       </Box>
 
-                      {/* Selected Card: ALL services wrapped across up to 4 lines */}
-                      {isSelected && cfg.isValid && cfg.services.length > 0 && (
-                        <Box width="100%" flexDirection="column" marginTop={0}>
+                      <Box width="100%" flexDirection="row" paddingLeft={3}>
+                        {cfg.isValid ? (
+                          <Text color={isSelected ? theme.colors.running : theme.colors.textMuted}>
+                            ● {cfg.servicesCount} {cfg.servicesCount === 1 ? 'service' : 'services'}
+                            {showConfigName && cfg.name && cfg.name !== 'services' && cfg.name !== cfg.filename.replace(/\.devpulse\.json$/, '')
+                              ? <Text color={theme.colors.textDim}> · {cfg.name}</Text>
+                              : null}
+                          </Text>
+                        ) : (
+                          <Text color={theme.colors.stopped} bold>✖ Invalid configuration</Text>
+                        )}
+                      </Box>
+
+                      {isSelected && cfg.isValid && cfg.services.length > 0 && visibleServiceLines.length > 0 && (
+                        <Box width="100%" flexDirection="column" marginTop={1} paddingLeft={3}>
+                          <Text color={theme.colors.textDim} bold>SERVICES</Text>
                           {visibleServiceLines.map((line, lineIdx) => (
                             <Box key={lineIdx} width="100%" flexDirection="row" alignItems="center" flexWrap="nowrap">
-                              <Text color={theme.colors.textDim}>
-                                {lineIdx === 0 ? '    Services: ' : ' '.repeat(14)}
-                              </Text>
                               <Box flexDirection="row" alignItems="center" flexShrink={1} flexWrap="nowrap">
                                 {line.map((svc, sIdx) => (
                                   <Box key={sIdx} marginRight={1} flexShrink={0}>
-                                    <Text color={theme.colors.textPrimary}>
-                                      {svc.name}
-                                    </Text>
+                                    <Text color={theme.colors.textPrimary}>{svc.name}</Text>
                                     {svc.port ? <Text color={theme.colors.accent}>:{svc.port}</Text> : null}
                                     {sIdx < line.length - 1 ? (
                                       <Text color={theme.colors.textDim}> ·</Text>
                                     ) : null}
                                   </Box>
                                 ))}
-                                {lineIdx === visibleServiceLines.length - 1 && hiddenServiceCount > 0 && (
-                                  <Text color={theme.colors.textDim}>+{hiddenServiceCount} more</Text>
-                                )}
                               </Box>
                             </Box>
                           ))}
+                          {hiddenServiceCount > 0 && (
+                            <Text color={theme.colors.textDim}>+{hiddenServiceCount} more</Text>
+                          )}
                         </Box>
                       )}
 
                       {isSelected && cfg.isValid && cfg.services.length === 0 && (
-                        <Box width="100%" marginTop={0}>
-                          <Text color={theme.colors.textDim}>    No services configured</Text>
+                        <Box width="100%" marginTop={1} paddingLeft={3}>
+                          <Text color={theme.colors.textDim}>No services configured</Text>
                         </Box>
                       )}
 
                       {cfg.error && (
-                        <Box width="100%" marginTop={0}>
-                          <Text color={theme.colors.stopped}>    {cfg.error}</Text>
+                        <Box width="100%" marginTop={1} paddingLeft={3}>
+                          <Text color={theme.colors.stopped} wrap="truncate-end">{cfg.error}</Text>
                         </Box>
                       )}
                     </Box>
                   </Clickable>
                 );
-              })}
+                  })}
+                </Box>
+              ))}
 
               {hiddenBelow > 0 && (
                 <Box width="100%">
@@ -439,7 +457,7 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
           backgroundColor={theme.colors.canvas}
         >
           <Box flexDirection="row" alignItems="center" flexWrap="nowrap">
-            <Box marginRight={2}><Text color={theme.colors.accent} bold>[↑↓/Click]</Text><Text color={theme.colors.textMuted}> Select</Text></Box>
+            <Box marginRight={2}><Text color={theme.colors.accent} bold>[←↑↓→/Click]</Text><Text color={theme.colors.textMuted}> Select</Text></Box>
             <Box marginRight={2}><Text color={theme.colors.textPrimary} bold>[Enter/1-9]</Text><Text color={theme.colors.textMuted}> Launch</Text></Box>
             <Box marginRight={2}><Text color={theme.colors.textPrimary} bold>[w]</Text><Text color={theme.colors.textMuted}> New Profile</Text></Box>
             <Box marginRight={2}><Text color={theme.colors.textDim} bold>[Esc]</Text><Text color={theme.colors.textMuted}> Exit</Text></Box>
@@ -456,4 +474,3 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
 };
 
 export default ConfigSelectorScreen;
-

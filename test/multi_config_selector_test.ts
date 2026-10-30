@@ -171,7 +171,24 @@ try {
   if (!output.includes('Launch Profile (Enter)') || !output.includes('New Profile (w)')) {
     throw new Error('Action bar buttons missing from UI render');
   }
-  console.log('✔ ConfigSelectorScreen renders beautiful Cyber Pulse cards and action controls');
+  if (!output.includes('SERVICES') || !output.includes('auth') || !output.includes('api')) {
+    throw new Error('Selected profile service list is missing from UI render');
+  }
+
+  const narrowOutput = renderToString(
+    React.createElement(ConfigSelectorScreen, {
+      configs: validSummaries,
+      onSelect: () => {},
+      onNewConfig: () => {},
+      onCancel: () => {},
+      width: 60,
+      height: 26
+    })
+  );
+  if (!narrowOutput.includes('SELECT A PROFILE')) {
+    throw new Error('Narrow terminal selector layout was not rendered');
+  }
+  console.log('✔ ConfigSelectorScreen renders responsive profile cards, service details, and action controls');
 
   console.log('\n✅ ALL MULTI-CONFIG SELECTOR TESTS PASSED PERFECTLY!\n');
 } finally {
@@ -180,4 +197,3 @@ try {
     fs.rmdirSync(tmpDir);
   }
 }
-
