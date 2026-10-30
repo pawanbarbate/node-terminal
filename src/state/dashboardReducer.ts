@@ -31,6 +31,7 @@ export interface DashboardState {
   narrowTab: NarrowTab;
   time: string;
   uptimeSeconds: number;
+  startedAt?: number;
   metrics: SystemMetrics;
   services: Service[];
   restartingServiceId: string | null;
@@ -93,7 +94,7 @@ export function configToServices(config?: DevPulseConfig): Service[] {
       p99: '0 ms',
       requests: '0 req/min'
     },
-    env: s.envFile ? [{ key: 'ENV_FILE', value: s.envFile }] : [],
+    env: [],
     logs: [],
     errorLogs: []
   }));
@@ -107,6 +108,7 @@ export function createInitialDashboardState(config?: DevPulseConfig): DashboardS
 
   return {
     ...initialDashboardState,
+    startedAt: Date.now(),
     services,
     globalLogs: config?.services && config.services.length > 0 ? [] : INITIAL_GLOBAL_LOGS,
     filterOptions,
@@ -343,14 +345,19 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
       };
 
     case 'TICK_CLOCK': {
-      const nextUptime = state.uptimeSeconds + 1;
+      const now = Date.now();
+      const nextUptime = state.startedAt
+        ? Math.max(0, Math.floor((now - state.startedAt) / 1000))
+        : state.uptimeSeconds + 1;
       const mins = Math.floor(nextUptime / 60);
       const secs = nextUptime % 60;
       const newCpu = Math.min(48, Math.max(12, state.metrics.cpu + action.cpuChange));
 
       const updatedServices = state.services.map(s => {
         if (s.status === 'running') {
-          const u = (s.uptimeSeconds || 0) + 1;
+          const u = s.startedAt
+            ? Math.max(0, Math.floor((now - s.startedAt) / 1000))
+            : (s.uptimeSeconds || 0) + 1;
           const m = Math.floor(u / 60);
           const sc = u % 60;
           return {
@@ -407,13 +414,17 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         if (s.name.toLowerCase() === action.serviceName.toLowerCase()) {
           const isNowRunning = action.status === 'running';
           const wasRunning = s.status === 'running';
+          const startedAt = isNowRunning
+            ? (wasRunning ? (s.startedAt || Date.now()) : Date.now())
+            : undefined;
           return {
             ...s,
             status: action.status,
             statusText: action.statusText || action.status.toUpperCase(),
             pid: action.pid ? String(action.pid) : (action.status === 'stopped' ? '-' : s.pid),
+            startedAt,
             uptime: isNowRunning ? (wasRunning ? s.uptime : '0s') : '0s',
-            uptimeSeconds: isNowRunning ? (wasRunning ? s.uptimeSeconds : 0) : 0,
+            uptimeSeconds: isNowRunning ? (wasRunning ? (s.uptimeSeconds || 0) : 0) : 0,
             restartingServiceId: action.status === 'running' && state.restartingServiceId === s.id
               ? null
               : state.restartingServiceId

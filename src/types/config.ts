@@ -7,14 +7,19 @@ export interface ServiceConfig {
   dependsOn?: string[];
   port?: number;
   autoStart?: boolean;
-  envFile?: string;
   readyPattern?: string;
+}
+
+export interface OrchestratorSettings {
+  bootStaggerMs?: number;
+  maxConcurrentBoot?: number;
 }
 
 export interface DevPulseConfig {
   $schema?: string;
   name?: string;
   version?: string;
+  settings?: OrchestratorSettings;
   services: ServiceConfig[];
 }
 

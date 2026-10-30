@@ -13,9 +13,9 @@ export interface ServiceFormProps {
   width?: number;
 }
 
-type FieldName = 'name' | 'path' | 'command' | 'port' | 'autoStart' | 'submit';
+type FieldName = 'name' | 'path' | 'command' | 'port' | 'autoStart' | 'dependsOn' | 'preStart' | 'submit';
 
-const FIELDS: FieldName[] = ['name', 'path', 'command', 'port', 'autoStart', 'submit'];
+const FIELDS: FieldName[] = ['name', 'path', 'command', 'port', 'autoStart', 'dependsOn', 'preStart', 'submit'];
 
 export const ServiceForm: React.FC<ServiceFormProps> = ({
   initialValues,
@@ -33,6 +33,8 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({
   );
   const [port, setPort] = useState(initialValues?.port ? String(initialValues.port) : '');
   const [autoStart, setAutoStart] = useState<boolean>(initialValues?.autoStart ?? true);
+  const [dependsOn, setDependsOn] = useState(Array.isArray(initialValues?.dependsOn) ? initialValues.dependsOn.join(', ') : '');
+  const [preStart, setPreStart] = useState(Array.isArray(initialValues?.preStart) ? initialValues.preStart.join(' && ') : '');
   const [focusedField, setFocusedField] = useState<FieldName>('name');
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,8 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({
     if (sug.command) setCommand(Array.isArray(sug.command) ? sug.command.join(' && ') : sug.command);
     if (sug.port) setPort(String(sug.port));
     if (sug.autoStart !== undefined) setAutoStart(sug.autoStart);
+    if (sug.dependsOn) setDependsOn(Array.isArray(sug.dependsOn) ? sug.dependsOn.join(', ') : '');
+    if (sug.preStart) setPreStart(Array.isArray(sug.preStart) ? sug.preStart.join(' && ') : '');
   };
 
   const handleFormSubmit = () => {
@@ -70,13 +74,25 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({
       return;
     }
 
+    const parsedDeps = dependsOn.trim()
+      ? dependsOn.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : undefined;
+
+    const parsedPre = preStart.trim()
+      ? (preStart.includes('&&')
+          ? preStart.split('&&').map(s => s.trim()).filter(Boolean)
+          : [preStart.trim()])
+      : undefined;
+
     setError(null);
     onSubmit({
       name: name.trim(),
       path: pathValue.trim(),
       command: command.trim(),
       port: parsedPort,
-      autoStart
+      autoStart,
+      dependsOn: parsedDeps,
+      preStart: parsedPre
     });
   };
 
@@ -141,6 +157,12 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({
     } else if (focusedField === 'port') {
       if (key.backspace || key.delete) setPort(prev => prev.slice(0, -1));
       else if (/^\d$/.test(input)) setPort(prev => prev + input);
+    } else if (focusedField === 'dependsOn') {
+      if (key.backspace || key.delete) setDependsOn(prev => prev.slice(0, -1));
+      else if (input && !key.ctrl && !key.meta) setDependsOn(prev => prev + input);
+    } else if (focusedField === 'preStart') {
+      if (key.backspace || key.delete) setPreStart(prev => prev.slice(0, -1));
+      else if (input && !key.ctrl && !key.meta) setPreStart(prev => prev + input);
     }
   });
 

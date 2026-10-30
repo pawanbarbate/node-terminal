@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import { Service, ActiveTab } from '../types/index.js';
 import Clickable from './common/ClickManager.js';
 import { theme } from '../theme/theme.js';
+import useSpinner from '../hooks/useSpinner.js';
 
 export interface ServiceDetailPanelProps {
   service?: Service;
@@ -49,14 +50,16 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
   const maxMsgLen = Math.max(12, innerWidth - 22);
 
   const isRunning = service.status === 'running';
+  const isBooting = isRestarting || service.status === 'starting';
+  const spinner = useSpinner(isBooting, 80);
 
   const getStatusInfo = () => {
     if (isRestarting || service.status === 'starting') {
       return { 
-        bg: theme.colors.warningBg, 
-        fg: theme.colors.warning, 
-        text: isRestarting ? 'RESTARTING' : 'STARTING', 
-        dot: theme.colors.warning 
+        bg: theme.colors.card, 
+        fg: theme.colors.accent, 
+        text: isRestarting ? `${spinner} RESTARTING` : `${spinner} ${service.statusText || 'STARTING'}`, 
+        dot: theme.colors.accent 
       };
     }
     switch (service.status) {
@@ -85,7 +88,7 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
         return { 
           bg: theme.colors.warningBg, 
           fg: theme.colors.warning, 
-          text: service.statusText || 'WAITING', 
+          text: `⏳ ${service.statusText || 'WAITING'}`, 
           dot: theme.colors.warning 
         };
       case 'blocked':

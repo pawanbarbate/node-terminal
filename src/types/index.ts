@@ -47,6 +47,7 @@ export interface Service {
   statusText?: string;
   uptime: string;
   uptimeSeconds?: number;
+  startedAt?: number;
   command: string;
   path?: string;
   port: string;

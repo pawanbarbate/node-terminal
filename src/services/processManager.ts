@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import net from 'net';
-import { ServiceConfig } from '../types/config.js';
+import { ServiceConfig, OrchestratorSettings } from '../types/config.js';
 import { LogEntry, ProcessCallbacks, ServiceStatus } from '../types/index.js';
 import { logger } from '../logger/logger.js';
 import { normalizeServiceCommands, resolveDependencyTiers } from './dependencyGraph.js';
@@ -239,23 +239,7 @@ class ProcessManager {
 
     callbacks.onStatusChange(service.name, 'starting');
 
-    // Parse env file if specified
     const customEnv: Record<string, string> = {};
-    if (service.envFile) {
-      const envPath = path.resolve(resolvedCwd, service.envFile);
-      if (fs.existsSync(envPath)) {
-        try {
-          const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
-              const [k, ...v] = trimmed.split('=');
-              customEnv[k.trim()] = v.join('=').trim();
-            }
-          }
-        } catch {}
-      }
-    }
 
     // Normalize command pipeline
     const pipeline = normalizeServiceCommands(service);
@@ -542,14 +526,22 @@ class ProcessManager {
 
   /**
    * Dependency-aware startAll: computes topological tiers and boots services wave-by-wave
+   * with pacing (stagger delay) and concurrency throttling to prevent CPU/memory exhaustion.
    */
-  public async startAll(services: ServiceConfig[], callbacks: ProcessCallbacks): Promise<void> {
+  public async startAll(
+    services: ServiceConfig[], 
+    callbacks: ProcessCallbacks,
+    settings?: OrchestratorSettings
+  ): Promise<void> {
     for (const service of services) {
       this.knownConfigs.set(service.name, service);
     }
 
     const autoServices = services.filter(s => s.autoStart !== false);
     if (autoServices.length === 0) return;
+
+    const bootStaggerMs = settings?.bootStaggerMs ?? 400;
+    const maxConcurrentBoot = Math.max(1, settings?.maxConcurrentBoot ?? 2);
 
     // Resolve dependency tiers using Kahn's algorithm
     const { tiers, hasCycle, cycleNodes, missingDependencies } = resolveDependencyTiers(autoServices);
@@ -597,12 +589,33 @@ class ProcessManager {
       }
     }
 
-    // Boot tier by tier
+    // Boot tier by tier with concurrency throttling & pacing stagger
     for (let tierIdx = 0; tierIdx < tiers.length; tierIdx++) {
       const tier = tiers[tierIdx]!;
       const readyPromises: Promise<boolean>[] = [];
 
-      for (const service of tier) {
+      // Concurrency slot controller for current tier
+      let activeBooting = 0;
+      const waitingResolvers: (() => void)[] = [];
+
+      const acquireSlot = async () => {
+        if (activeBooting < maxConcurrentBoot) {
+          activeBooting++;
+          return;
+        }
+        await new Promise<void>(resolve => waitingResolvers.push(resolve));
+        activeBooting++;
+      };
+
+      const releaseSlot = () => {
+        activeBooting--;
+        const next = waitingResolvers.shift();
+        if (next) next();
+      };
+
+      for (let sIdx = 0; sIdx < tier.length; sIdx++) {
+        const service = tier[sIdx]!;
+
         // Check if any upstream dependency failed
         const deps = service.dependsOn || [];
         const failedDep = deps.find(d => failedServices.has(d.toLowerCase()));
@@ -619,35 +632,48 @@ class ProcessManager {
           continue;
         }
 
+        // Wait for an available concurrency slot before proceeding
+        await acquireSlot();
+
+        // Stagger spacing between consecutive process spawns in this wave
+        if (sIdx > 0 && bootStaggerMs > 0) {
+          await new Promise(r => setTimeout(r, bootStaggerMs));
+        }
+
         // Start service
         const startPromise = (async () => {
-          const pid = await this.startService(service, callbacks);
-          if (pid === null) {
-            failedServices.add(service.name.toLowerCase());
-            return false;
-          }
+          try {
+            const pid = await this.startService(service, callbacks);
+            if (pid === null) {
+              failedServices.add(service.name.toLowerCase());
+              return false;
+            }
 
-          // Wait for readiness before downstream tiers can proceed
-          const isReady = await this.waitForServiceReady(service);
-          if (!isReady) {
-            failedServices.add(service.name.toLowerCase());
-            callbacks.onLog(service.name, {
-              id: `warn-ready-${service.name}-${Date.now()}-${this.logCounter++}`,
-              timestamp: this.formatTime(),
-              service: service.name,
-              message: `⚠ Service "${service.name}" did not reach ready state. Downstream dependent services will be blocked.`,
-              level: 'warn'
-            });
-          } else {
-            callbacks.onLog(service.name, {
-              id: `ready-${service.name}-${Date.now()}-${this.logCounter++}`,
-              timestamp: this.formatTime(),
-              service: service.name,
-              message: `✔ Service "${service.name}" is READY${service.port ? ` on port :${service.port}` : ''}.`,
-              level: 'info'
-            });
+            // Wait for readiness before downstream tiers can proceed
+            const isReady = await this.waitForServiceReady(service);
+            if (!isReady) {
+              failedServices.add(service.name.toLowerCase());
+              callbacks.onLog(service.name, {
+                id: `warn-ready-${service.name}-${Date.now()}-${this.logCounter++}`,
+                timestamp: this.formatTime(),
+                service: service.name,
+                message: `⚠ Service "${service.name}" did not reach ready state. Downstream dependent services will be blocked.`,
+                level: 'warn'
+              });
+            } else {
+              callbacks.onLog(service.name, {
+                id: `ready-${service.name}-${Date.now()}-${this.logCounter++}`,
+                timestamp: this.formatTime(),
+                service: service.name,
+                message: `✔ Service "${service.name}" is READY${service.port ? ` on port :${service.port}` : ''}.`,
+                level: 'info'
+              });
+            }
+            return isReady;
+          } finally {
+            // Release slot as soon as this service finishes booting/probing so next can spawn
+            releaseSlot();
           }
-          return isReady;
         })();
 
         readyPromises.push(startPromise);

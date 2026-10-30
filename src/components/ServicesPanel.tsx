@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import { Service, ServiceStatus } from '../types/index.js';
 import Clickable from './common/ClickManager.js';
 import { theme } from '../theme/theme.js';
+import useSpinner from '../hooks/useSpinner.js';
 
 export interface ServicesPanelProps {
   services?: Service[];
@@ -49,6 +50,9 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
   };
 
   const innerWidth = Math.max(16, panelWidth - 4);
+  const isAnyBooting = services.some(s => s.status === 'starting' || s.status === 'waiting');
+  const spinner = useSpinner(isAnyBooting, 80);
+  const runningCount = services.filter(s => s.status === 'running').length;
 
   // Windowing calculation: ensure selectedIndex is always within the visible view
   // Option 2 (Enclosed Boxed Cards): 4 rows for 2-line cards, 3 rows for compact 1-line cards
@@ -87,12 +91,16 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
           <Text color={isFocused ? theme.colors.accent : theme.colors.textSecondary} bold>
             SERVICES ({services.length})
           </Text>
-          {services.length > maxVisibleCards ? (
+          {isAnyBooting ? (
+            <Text color={theme.colors.accent} bold>
+              {spinner} {runningCount}/{services.length} Booting
+            </Text>
+          ) : services.length > maxVisibleCards ? (
             <Text color={theme.colors.accent}>
               {hasMoreAbove ? '▲' : ' '}{hasMoreBelow ? '▼' : ' '} [{selectedIndex + 1}/{services.length}]
             </Text>
           ) : (
-            <Text color={theme.colors.textMuted}>+ ↻</Text>
+            <Text color={theme.colors.running}>● {runningCount} Running</Text>
           )}
         </Box>
       </Clickable>
@@ -104,6 +112,9 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
           const isSelected = index === selectedIndex;
           const dotColor = getStatusColor(service.status);
           const portText = cleanPort(service.port);
+          const isBooting = service.status === 'starting' || service.status === 'waiting';
+          const isStarting = service.status === 'starting';
+          const isWaiting = service.status === 'waiting';
 
           // Compact 1-line mode for standard (<= 25 rows) terminals
           if (isCompactHeight) {
@@ -125,8 +136,8 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                 marginBottom={0}
               >
                 <Box flexDirection="row" alignItems="center" flexShrink={1}>
-                  <Text color={isSelected ? theme.colors.accent : dotColor} bold={isSelected}>
-                    {isSelected ? '▎ ' : '● '}
+                  <Text color={isSelected ? theme.colors.accent : (isStarting ? theme.colors.accent : dotColor)} bold={isSelected || isBooting}>
+                    {isSelected ? '▎ ' : (isStarting ? `${spinner} ` : (isWaiting ? '⏳ ' : '● '))}
                   </Text>
                   <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
                     {service.name}
@@ -138,8 +149,14 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                       {`[${portText}] `}
                     </Text>
                   ) : null}
-                  <Text color={isSelected ? (service.status === 'running' ? theme.colors.running : dotColor) : theme.colors.textMuted}>
-                    {service.status === 'running' ? service.uptime : (service.statusText || service.status.toUpperCase())}
+                  <Text color={isSelected ? (service.status === 'running' ? theme.colors.running : (isStarting ? theme.colors.accent : dotColor)) : (isStarting ? theme.colors.accent : theme.colors.textMuted)}>
+                    {service.status === 'running'
+                      ? service.uptime
+                      : (isStarting
+                          ? `${spinner} ${service.statusText || 'STARTING'}`
+                          : (isWaiting
+                              ? `⏳ ${service.statusText || 'WAITING'}`
+                              : (service.statusText || service.status.toUpperCase())))}
                   </Text>
                 </Box>
               </Clickable>
@@ -165,8 +182,8 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
               {/* Row 1: Status Indicator, Service Name & Uptime / Status */}
               <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
                 <Box flexDirection="row" alignItems="center" flexShrink={1}>
-                  <Text color={isSelected ? theme.colors.accent : dotColor} bold={isSelected}>
-                    {isSelected ? '▎ ' : '● '}
+                  <Text color={isSelected ? theme.colors.accent : (isStarting ? theme.colors.accent : dotColor)} bold={isSelected || isBooting}>
+                    {isSelected ? '▎ ' : (isStarting ? `${spinner} ` : (isWaiting ? '⏳ ' : '● '))}
                   </Text>
                   <Text color={isSelected ? theme.colors.textPrimary : theme.colors.textSecondary} bold={isSelected} wrap="truncate-end">
                     {service.name}
@@ -178,8 +195,12 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                       {service.uptime}
                     </Text>
                   ) : (
-                    <Text color={dotColor} bold={isSelected}>
-                      {service.statusText || String(service.status).toUpperCase()}
+                    <Text color={isStarting ? theme.colors.accent : dotColor} bold={isSelected || isBooting}>
+                      {isStarting
+                        ? `${spinner} ${service.statusText || 'STARTING'}`
+                        : (isWaiting
+                            ? `⏳ ${service.statusText || 'WAITING'}`
+                            : (service.statusText || String(service.status).toUpperCase()))}
                     </Text>
                   )}
                 </Box>

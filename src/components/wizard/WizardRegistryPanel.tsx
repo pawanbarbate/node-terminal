@@ -55,7 +55,20 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
 }) => {
   const innerWidth = Math.max(16, panelWidth - 4);
   // Allocate available rows for enclosed cards (4 rows per card)
-  const maxVisibleServices = Math.max(1, Math.floor((contentHeight - 10) / 4));
+  const cardHeight = 4;
+  const maxVisibleServices = Math.max(1, Math.floor((contentHeight - 10) / cardHeight));
+
+  let startIndex = 0;
+  if (services.length > maxVisibleServices) {
+    if (selectedIndex >= maxVisibleServices) {
+      startIndex = selectedIndex - maxVisibleServices + 1;
+    }
+    startIndex = Math.max(0, Math.min(services.length - maxVisibleServices, startIndex));
+  }
+
+  const visibleServices = services.slice(startIndex, startIndex + maxVisibleServices);
+  const hasMoreAbove = startIndex > 0;
+  const hasMoreBelow = startIndex + maxVisibleServices < services.length;
 
   return (
     <Box 
@@ -77,7 +90,13 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
           <Text color={isFocused ? theme.colors.accent : theme.colors.textSecondary} bold>
             {panelWidth < 35 ? `REGISTRY (${services.length})` : `SERVICE REGISTRY (${services.length})`}
           </Text>
-          <Text color={theme.colors.textMuted}>{isUltraNarrow ? '[Tab: Form]' : '[↑↓ / Click]'}</Text>
+          {services.length > maxVisibleServices ? (
+            <Text color={theme.colors.accent} bold>
+              {hasMoreAbove ? '▲' : ' '}{hasMoreBelow ? '▼' : ' '} [{selectedIndex + 1}/{services.length}]
+            </Text>
+          ) : (
+            <Text color={theme.colors.textMuted}>{isUltraNarrow ? '[Tab: Form]' : '[↑↓ / Click]'}</Text>
+          )}
         </Box>
 
         {/* Workspace Path Breadcrumb */}
@@ -134,15 +153,16 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
         ) : (
           /* Discrete Enclosed Service Cards (Matching Main Dashboard Synergy) */
           <Box flexDirection="column" width="100%">
-            {services.slice(0, maxVisibleServices).map((svc, idx) => {
-              const isSelected = idx === selectedIndex && !isEditingNew;
+            {visibleServices.map((svc, vIdx) => {
+              const realIdx = startIndex + vIdx;
+              const isSelected = realIdx === selectedIndex && !isEditingNew;
               const portText = cleanPort(svc.port);
 
               return (
                 <Clickable
-                  key={idx}
-                  id={`service-row-${idx}`}
-                  onClick={() => onSelectService?.(idx)}
+                  key={realIdx}
+                  id={`service-row-${realIdx}`}
+                  onClick={() => onSelectService?.(realIdx)}
                   borderStyle="round"
                   borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
                   backgroundColor={isSelected ? theme.colors.card : undefined}
@@ -173,16 +193,23 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
                     </Box>
                   </Box>
 
-                  {/* Row 2: Subtitle Path & Execution Command */}
+                  {/* Row 2: Subtitle Path, Dependencies & Execution Command */}
                   <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="nowrap">
-                    <Box flexShrink={1} flexGrow={0}>
+                    <Box flexDirection="row" alignItems="center" flexShrink={1}>
                       <Text color={theme.colors.textDim} wrap="truncate-end">
                         {svc.path}
                       </Text>
+                      {svc.dependsOn && svc.dependsOn.length > 0 ? (
+                        <Box backgroundColor={theme.colors.card} paddingX={1} marginLeft={1} flexShrink={0}>
+                          <Text color={theme.colors.accent}>
+                            needs: {svc.dependsOn.join(',')}
+                          </Text>
+                        </Box>
+                      ) : null}
                     </Box>
                     <Box flexShrink={0} marginLeft={1}>
                       <Text color={isSelected ? theme.colors.textSecondary : theme.colors.textMuted} wrap="truncate-end">
-                        {'↓ '}{svc.command}
+                        {'↓ '}{Array.isArray(svc.command) ? svc.command.join(' && ') : (svc.command || '')}
                       </Text>
                     </Box>
                   </Box>

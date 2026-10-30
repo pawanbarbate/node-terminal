@@ -5,7 +5,15 @@ import { validateDirectory } from '../../services/configManager.js';
 import Clickable from '../common/ClickManager.js';
 import { theme, getServiceBadgeStyle } from '../../theme/theme.js';
 
-export type WizardFormField = 'name' | 'path' | 'command' | 'port' | 'autoStart' | 'saveBtn';
+export type WizardFormField = 
+  | 'name' 
+  | 'path' 
+  | 'command' 
+  | 'port' 
+  | 'autoStart' 
+  | 'dependsOn' 
+  | 'preStart' 
+  | 'saveBtn';
 
 export interface WizardFormPanelProps {
   isEditingNew: boolean;
@@ -16,6 +24,9 @@ export interface WizardFormPanelProps {
   command: string;
   port: string;
   autoStart: boolean;
+  dependsOnStr?: string;
+  preStartStr?: string;
+  availableServices?: string[];
   focusedField: WizardFormField;
   isFocused: boolean;
   error: string | null;
@@ -25,6 +36,7 @@ export interface WizardFormPanelProps {
   isUltraNarrow?: boolean;
   onFocusField?: (field: WizardFormField) => void;
   onToggleAutoStart?: () => void;
+  onAddDependency?: (depName: string) => void;
   onApplySuggestion?: (sug: Partial<ServiceConfig>) => void;
   onSubmit?: () => void;
   onClear?: () => void;
@@ -39,6 +51,9 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
   command,
   port,
   autoStart,
+  dependsOnStr = '',
+  preStartStr = '',
+  availableServices = [],
   focusedField,
   isFocused,
   error,
@@ -48,25 +63,32 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
   isUltraNarrow = false,
   onFocusField,
   onToggleAutoStart,
+  onAddDependency,
   onApplySuggestion,
   onSubmit,
   onClear
 }) => {
   const isDirValid = pathValue.trim() ? validateDirectory(pathValue.trim()) : false;
   const innerWidth = Math.max(20, panelWidth - 4);
-  const labelWidth = panelWidth < 50 ? 10 : 12;
+  const labelWidth = 11;
 
   const displayTitle = name.trim() || (isEditingNew ? 'New Service' : 'Service');
   const badge = getServiceBadgeStyle(displayTitle);
 
   // Live Bash execution preview string
   const resolvedDir = pathValue.trim() || './';
+  const resolvedPre = preStartStr.trim() ? `${preStartStr.trim()} && ` : '';
   const resolvedCmd = command.trim() || 'npm run dev';
   const envPortPrefix = port.trim() ? `PORT=${port.trim()} ` : '';
-  const bashCommandPreview = `$ cd ${resolvedDir} && ${envPortPrefix}${resolvedCmd}`;
+  const bashCommandPreview = `$ cd ${resolvedDir} && ${resolvedPre}${envPortPrefix}${resolvedCmd}`;
   const truncatedBash = bashCommandPreview.length > innerWidth - 2
     ? `${bashCommandPreview.slice(0, innerWidth - 3)}…`
     : bashCommandPreview;
+
+  const parsedDeps = dependsOnStr
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
   return (
     <Box 
@@ -105,7 +127,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
         {suggestions.length > 0 ? (
           <Box flexDirection="row" flexWrap="nowrap" alignItems="center" marginBottom={0}>
             <Text color={theme.colors.textMuted}>Detected: </Text>
-            {suggestions.slice(0, panelWidth < 60 ? 1 : 2).map((sug, i) => (
+            {suggestions.slice(0, 1).map((sug, i) => (
               <Clickable
                 key={i}
                 id={`chip-suggestion-${i}`}
@@ -150,7 +172,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                 </Text>
               </Box>
               <Box flexGrow={1} flexShrink={1}>
-                <Text color={theme.colors.textPrimary} bold={focusedField === 'name'}>
+                <Text color={theme.colors.textPrimary} bold={focusedField === 'name'} wrap="truncate-end">
                   {name || (focusedField === 'name' ? '' : 'e.g. auth-service')}
                 </Text>
                 {focusedField === 'name' && <Text color={theme.colors.accent}>▎</Text>}
@@ -180,7 +202,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                 </Text>
               </Box>
               <Box flexGrow={1} flexShrink={1}>
-                <Text color={theme.colors.textPrimary} bold={focusedField === 'path'}>
+                <Text color={theme.colors.textPrimary} bold={focusedField === 'path'} wrap="truncate-end">
                   {pathValue || (focusedField === 'path' ? '' : 'e.g. ./services/auth')}
                 </Text>
                 {focusedField === 'path' && <Text color={theme.colors.accent}>▎</Text>}
@@ -216,7 +238,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                 </Text>
               </Box>
               <Box flexGrow={1} flexShrink={1}>
-                <Text color={theme.colors.textPrimary} bold={focusedField === 'command'}>
+                <Text color={theme.colors.textPrimary} bold={focusedField === 'command'} wrap="truncate-end">
                   {command || (focusedField === 'command' ? '' : 'e.g. npm run dev')}
                 </Text>
                 {focusedField === 'command' && <Text color={theme.colors.accent}>▎</Text>}
@@ -264,10 +286,76 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               </Box>
             </Clickable>
           </Box>
+
+          {/* Field 5: Service Dependencies (dependsOn) */}
+          <Clickable id="input-field-dependson" onClick={() => onFocusField?.('dependsOn')}>
+            <Box 
+              flexDirection="row" 
+              justifyContent="space-between" 
+              alignItems="center" 
+              backgroundColor={focusedField === 'dependsOn' ? theme.colors.cardHover : theme.colors.card}
+              paddingX={1}
+              marginBottom={0}
+              flexWrap="nowrap"
+            >
+              <Box flexDirection="row" alignItems="center" flexShrink={0} width={labelWidth}>
+                <Text color={focusedField === 'dependsOn' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'dependsOn'}>
+                  {focusedField === 'dependsOn' ? '▎ ' : '  '}Depends:
+                </Text>
+              </Box>
+              <Box flexGrow={1} flexShrink={1}>
+                <Text color={theme.colors.textPrimary} bold={focusedField === 'dependsOn'} wrap="truncate-end">
+                  {dependsOnStr || (focusedField === 'dependsOn' ? '' : 'e.g. orders, products')}
+                </Text>
+                {focusedField === 'dependsOn' && <Text color={theme.colors.accent}>▎</Text>}
+              </Box>
+              <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
+                {availableServices && availableServices.length > 0 ? (
+                  availableServices.slice(0, 2).map((dep, dIdx) => (
+                    <Clickable key={dIdx} id={`chip-dep-${dep}`} onClick={() => onAddDependency?.(dep)}>
+                      <Box backgroundColor={theme.colors.surface} paddingX={1} marginLeft={1}>
+                        <Text color={theme.colors.accent}>+{dep}</Text>
+                      </Box>
+                    </Clickable>
+                  ))
+                ) : (
+                  <Text color={theme.colors.textDim}>DAG</Text>
+                )}
+              </Box>
+            </Box>
+          </Clickable>
+
+          {/* Field 6: Pre-Start Setup Pipeline (preStart) */}
+          <Clickable id="input-field-prestart" onClick={() => onFocusField?.('preStart')}>
+            <Box 
+              flexDirection="row" 
+              justifyContent="space-between" 
+              alignItems="center" 
+              backgroundColor={focusedField === 'preStart' ? theme.colors.cardHover : theme.colors.card}
+              paddingX={1}
+              marginBottom={0}
+              flexWrap="nowrap"
+            >
+              <Box flexDirection="row" alignItems="center" flexShrink={0} width={labelWidth}>
+                <Text color={focusedField === 'preStart' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'preStart'}>
+                  {focusedField === 'preStart' ? '▎ ' : '  '}Pre-cmd:
+                </Text>
+              </Box>
+              <Box flexGrow={1} flexShrink={1}>
+                <Text color={theme.colors.textPrimary} bold={focusedField === 'preStart'} wrap="truncate-end">
+                  {preStartStr || (focusedField === 'preStart' ? '' : 'e.g. npm run migrate')}
+                </Text>
+                {focusedField === 'preStart' && <Text color={theme.colors.accent}>▎</Text>}
+              </Box>
+              <Box flexShrink={0} marginLeft={1}>
+                <Text color={theme.colors.textDim}>step 1</Text>
+              </Box>
+            </Box>
+          </Clickable>
         </Box>
 
-        {/* Live Process Blueprint Preview (Fills the previous void!) */}
-        {contentHeight >= 20 && (
+        {/* Live Process Blueprint Preview (when terminal height is comfortable >= 26) */}
+        {contentHeight >= 26 && (
           <Box 
             flexDirection="column"
             borderStyle="round"
@@ -284,9 +372,15 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               </Text>
             </Box>
             <Text color={theme.colors.running} bold>{truncatedBash}</Text>
-            <Text color={theme.colors.textDim}>
-              Stdout/stderr aggregated into Global Logs & dedicated [{displayTitle}] tab
-            </Text>
+            {parsedDeps.length > 0 ? (
+              <Text color={theme.colors.warning}>
+                ⏳ WAITS FOR: [{parsedDeps.join(', ')}] on listening TCP ports
+              </Text>
+            ) : (
+              <Text color={theme.colors.textDim}>
+                ✔ Independent service (starts immediately in Tier 0)
+              </Text>
+            )}
           </Box>
         )}
       </Box>
