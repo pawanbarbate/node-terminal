@@ -71,6 +71,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
   const isDirValid = pathValue.trim() ? validateDirectory(pathValue.trim()) : false;
   const innerWidth = Math.max(20, panelWidth - 4);
   const labelWidth = 11;
+  const isCompact = isUltraNarrow || panelWidth < 58;
+  const isTight = contentHeight < 24;
 
   const displayTitle = name.trim() || (isEditingNew ? 'New Service' : 'Service');
   const badge = getServiceBadgeStyle(displayTitle);
@@ -89,6 +91,14 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+
+  const sectionHeading = (number: string, title: string) => (
+    <Box flexDirection="row" alignItems="center" marginTop={isTight ? 0 : 1} marginBottom={0}>
+      <Text color={theme.colors.accent} bold>{number} </Text>
+      <Text color={theme.colors.textSecondary} bold>{title}</Text>
+      {!isCompact && <Text color={theme.colors.borderSubtle}> {'─'.repeat(Math.max(3, innerWidth - 19))}</Text>}
+    </Box>
+  );
 
   return (
     <Box 
@@ -125,8 +135,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
 
         {/* Quick Suggestion Chips */}
         {suggestions.length > 0 ? (
-          <Box flexDirection="row" flexWrap="nowrap" alignItems="center" marginBottom={0}>
-            <Text color={theme.colors.textMuted}>Detected: </Text>
+          <Box flexDirection="row" flexWrap="nowrap" alignItems="center" marginTop={1}>
+            <Text color={theme.colors.textMuted}>DETECTED </Text>
             {suggestions.slice(0, 1).map((sug, i) => (
               <Clickable
                 key={i}
@@ -141,20 +151,22 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
             ))}
           </Box>
         ) : (
-          <Text color={theme.colors.textMuted}>
-            Configure microservice execution, folder path, and port:
-          </Text>
+          <Box marginTop={isTight ? 0 : 1}>
+            <Text color={theme.colors.textMuted}>Configure this service for your workspace.</Text>
+          </Box>
         )}
 
         {/* Error Alert Banner */}
         {error ? (
-          <Box backgroundColor={theme.colors.stoppedBg} paddingX={1} marginY={0}>
-            <Text color={theme.colors.stopped} bold>✖ Error: {error}</Text>
+          <Box backgroundColor={theme.colors.stoppedBg} paddingX={1} marginTop={1}>
+            <Text color={theme.colors.stopped} bold wrap="truncate-end">✖ {error}</Text>
           </Box>
         ) : null}
 
         {/* Form Input Cards Container */}
         <Box flexDirection="column" width="100%" marginTop={0}>
+          {sectionHeading('01', 'IDENTITY')}
+
           {/* Field 1: Service Name & Deterministic Badge */}
           <Clickable id="input-field-name" onClick={() => onFocusField?.('name')}>
             <Box 
@@ -162,6 +174,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               justifyContent="space-between" 
               alignItems="center" 
               backgroundColor={focusedField === 'name' ? theme.colors.cardHover : theme.colors.card}
+              borderStyle={focusedField === 'name' ? 'round' : undefined}
+              borderColor={focusedField === 'name' ? theme.colors.borderFocus : theme.colors.borderSubtle}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -192,6 +206,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               justifyContent="space-between" 
               alignItems="center" 
               backgroundColor={focusedField === 'path' ? theme.colors.cardHover : theme.colors.card}
+              borderStyle={focusedField === 'path' ? 'round' : undefined}
+              borderColor={focusedField === 'path' ? theme.colors.borderFocus : theme.colors.borderSubtle}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -221,6 +237,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
             </Box>
           </Clickable>
 
+          {sectionHeading('02', 'STARTUP')}
+
           {/* Field 3: Start Command */}
           <Clickable id="input-field-command" onClick={() => onFocusField?.('command')}>
             <Box 
@@ -228,6 +246,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               justifyContent="space-between" 
               alignItems="center" 
               backgroundColor={focusedField === 'command' ? theme.colors.cardHover : theme.colors.card}
+              borderStyle={focusedField === 'command' ? 'round' : undefined}
+              borderColor={focusedField === 'command' ? theme.colors.borderFocus : theme.colors.borderSubtle}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -250,42 +270,99 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
           </Clickable>
 
           {/* Field 4: Port & Auto-Start */}
-          <Box 
-            flexDirection="row" 
-            justifyContent="space-between" 
-            alignItems="center" 
-            backgroundColor={focusedField === 'port' || focusedField === 'autoStart' ? theme.colors.cardHover : theme.colors.card}
-            paddingX={1}
-            marginBottom={0}
-            flexWrap="nowrap"
-          >
-            {/* Port */}
-            <Clickable id="input-field-port" onClick={() => onFocusField?.('port')}>
-              <Box flexDirection="row" alignItems="center" flexShrink={0}>
-                <Box width={labelWidth}>
-                  <Text color={focusedField === 'port' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'port'}>
-                    {focusedField === 'port' ? '▎ ' : '  '}Port:
+          {isCompact ? (
+            <Box flexDirection="column">
+              <Clickable id="input-field-port" onClick={() => onFocusField?.('port')}>
+                <Box
+                  flexDirection="row"
+                  alignItems="center"
+                  backgroundColor={focusedField === 'port' ? theme.colors.cardHover : theme.colors.card}
+                  borderStyle={focusedField === 'port' ? 'round' : undefined}
+                  borderColor={focusedField === 'port' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  paddingX={1}
+                >
+                  <Box width={labelWidth}>
+                    <Text color={focusedField === 'port' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'port'}>
+                      {focusedField === 'port' ? '▎ ' : '  '}Port:
+                    </Text>
+                  </Box>
+                  <Text color={theme.colors.accent} bold>
+                    {port ? `:${port}` : (focusedField === 'port' ? '' : 'e.g. 3001')}
+                  </Text>
+                  {focusedField === 'port' && <Text color={theme.colors.accent}>▎</Text>}
+                </Box>
+              </Clickable>
+              <Clickable id="input-field-autostart" onClick={() => onToggleAutoStart?.()}>
+                <Box
+                  flexDirection="row"
+                  alignItems="center"
+                  backgroundColor={focusedField === 'autoStart' ? theme.colors.cardHover : theme.colors.card}
+                  borderStyle={focusedField === 'autoStart' ? 'round' : undefined}
+                  borderColor={focusedField === 'autoStart' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  paddingX={1}
+                >
+                  <Box width={labelWidth}>
+                    <Text color={focusedField === 'autoStart' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'autoStart'}>
+                      {focusedField === 'autoStart' ? '▎ ' : '  '}Boot:
+                    </Text>
+                  </Box>
+                  <Text color={autoStart ? theme.colors.running : theme.colors.textMuted} bold>
+                    {autoStart ? '[◉ Auto]' : '[○ Manual]'}
                   </Text>
                 </Box>
-                <Text color={theme.colors.accent} bold>
-                  {port ? `:${port}` : (focusedField === 'port' ? '' : 'e.g. 3001')}
-                </Text>
-                {focusedField === 'port' && <Text color={theme.colors.accent}>▎</Text>}
-              </Box>
-            </Clickable>
+              </Clickable>
+            </Box>
+          ) : (
+            <Box
+              flexDirection="row"
+              justifyContent="space-between"
+              alignItems="center"
+              flexWrap="nowrap"
+            >
+              <Clickable id="input-field-port" onClick={() => onFocusField?.('port')}>
+                <Box
+                  flexDirection="row"
+                  alignItems="center"
+                  flexShrink={0}
+                  backgroundColor={focusedField === 'port' ? theme.colors.cardHover : theme.colors.card}
+                  borderStyle={focusedField === 'port' ? 'round' : undefined}
+                  borderColor={focusedField === 'port' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  paddingX={1}
+                >
+                  <Box width={labelWidth}>
+                    <Text color={focusedField === 'port' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'port'}>
+                      {focusedField === 'port' ? '▎ ' : '  '}Port:
+                    </Text>
+                  </Box>
+                  <Text color={theme.colors.accent} bold>
+                    {port ? `:${port}` : (focusedField === 'port' ? '' : 'e.g. 3001')}
+                  </Text>
+                  {focusedField === 'port' && <Text color={theme.colors.accent}>▎</Text>}
+                </Box>
+              </Clickable>
+              <Clickable id="input-field-autostart" onClick={() => onToggleAutoStart?.()}>
+                <Box
+                  flexDirection="row"
+                  alignItems="center"
+                  flexShrink={0}
+                  marginLeft={1}
+                  backgroundColor={focusedField === 'autoStart' ? theme.colors.cardHover : theme.colors.card}
+                  borderStyle={focusedField === 'autoStart' ? 'round' : undefined}
+                  borderColor={focusedField === 'autoStart' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  paddingX={1}
+                >
+                  <Text color={focusedField === 'autoStart' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'autoStart'}>
+                    {focusedField === 'autoStart' ? '▶ ' : '  '}Boot:{' '}
+                  </Text>
+                  <Text color={autoStart ? theme.colors.running : theme.colors.textMuted} bold>
+                    {autoStart ? '[◉ Auto]' : '[○ Manual]'}
+                  </Text>
+                </Box>
+              </Clickable>
+            </Box>
+          )}
 
-            {/* Auto-Start Switch */}
-            <Clickable id="input-field-autostart" onClick={() => onToggleAutoStart?.()}>
-              <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
-                <Text color={focusedField === 'autoStart' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'autoStart'}>
-                  {focusedField === 'autoStart' ? '▶ ' : '  '}Boot:{' '}
-                </Text>
-                <Text color={autoStart ? theme.colors.running : theme.colors.textMuted} bold>
-                  {autoStart ? '[◉ Auto]' : '[○ Manual]'}
-                </Text>
-              </Box>
-            </Clickable>
-          </Box>
+          {sectionHeading('03', 'ORCHESTRATION')}
 
           {/* Field 5: Service Dependencies (dependsOn) */}
           <Clickable id="input-field-dependson" onClick={() => onFocusField?.('dependsOn')}>
@@ -294,6 +371,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               justifyContent="space-between" 
               alignItems="center" 
               backgroundColor={focusedField === 'dependsOn' ? theme.colors.cardHover : theme.colors.card}
+              borderStyle={focusedField === 'dependsOn' ? 'round' : undefined}
+              borderColor={focusedField === 'dependsOn' ? theme.colors.borderFocus : theme.colors.borderSubtle}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -332,6 +411,8 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               justifyContent="space-between" 
               alignItems="center" 
               backgroundColor={focusedField === 'preStart' ? theme.colors.cardHover : theme.colors.card}
+              borderStyle={focusedField === 'preStart' ? 'round' : undefined}
+              borderColor={focusedField === 'preStart' ? theme.colors.borderFocus : theme.colors.borderSubtle}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -386,7 +467,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
       </Box>
 
       {/* Lower Area: Action Buttons Row */}
-      <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginTop={1}>
+      <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginTop={isTight ? 0 : 1}>
         <Box flexDirection="row" alignItems="center">
           <Clickable id="btn-submit-form" onClick={() => onSubmit?.()} marginRight={1}>
             <Box 
@@ -394,7 +475,9 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               paddingX={2}
             >
               <Text color={focusedField === 'saveBtn' ? theme.colors.accent : theme.colors.textPrimary} bold>
-                {isEditingNew ? '+ Add to Registry' : '✔ Save Changes'}
+                {isCompact
+                  ? (isEditingNew ? '+ Add' : '✔ Save')
+                  : (isEditingNew ? '+ Add to Registry' : '✔ Save Changes')}
               </Text>
             </Box>
           </Clickable>
@@ -406,7 +489,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
           </Clickable>
         </Box>
 
-        <Text color={theme.colors.textMuted}>[Tab / ↑↓ fields]</Text>
+        <Text color={theme.colors.textMuted}>{isCompact ? '[Tab / ↑↓]' : '[Tab / ↑↓ fields]'}</Text>
       </Box>
     </Box>
   );
