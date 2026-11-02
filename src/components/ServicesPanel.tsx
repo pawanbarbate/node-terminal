@@ -95,6 +95,8 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
             <Text color={theme.colors.accent} bold>
               {spinner} {runningCount}/{services.length} Booting
             </Text>
+          ) : services.length === 0 ? (
+            <Text color={theme.colors.textMuted}>None configured</Text>
           ) : services.length > maxVisibleCards ? (
             <Text color={theme.colors.accent}>
               {hasMoreAbove ? '▲' : ' '}{hasMoreBelow ? '▼' : ' '} [{selectedIndex + 1}/{services.length}]
@@ -107,6 +109,9 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
 
       {/* Services List - Discrete Enclosed Cards (Boxed Tiles) */}
       <Box flexDirection="column" marginTop={0}>
+        {services.length === 0 ? (
+          <Text color={theme.colors.textMuted}>No services configured.</Text>
+        ) : null}
         {visibleServices.map((service, vIndex) => {
           const index = startIndex + vIndex;
           const isSelected = index === selectedIndex;

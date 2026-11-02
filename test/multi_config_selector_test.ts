@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import React from 'react';
 import { renderToString } from 'ink';
 import {
@@ -13,17 +14,12 @@ import { DevPulseConfig } from '../src/types/config.js';
 
 console.log('--- STARTING MULTI-CONFIG SELECTOR TESTS ---');
 
-const tmpDir = path.resolve(process.cwd(), 'test/fixtures/multi-config-sandbox');
-if (!fs.existsSync(tmpDir)) {
-  fs.mkdirSync(tmpDir, { recursive: true });
-}
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'devpulse-multi-config-'));
 
 function cleanSandbox() {
   if (fs.existsSync(tmpDir)) {
-    const files = fs.readdirSync(tmpDir);
-    for (const f of files) {
-      fs.unlinkSync(path.join(tmpDir, f));
-    }
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
   }
 }
 
@@ -192,8 +188,5 @@ try {
 
   console.log('\n✅ ALL MULTI-CONFIG SELECTOR TESTS PASSED PERFECTLY!\n');
 } finally {
-  cleanSandbox();
-  if (fs.existsSync(tmpDir)) {
-    fs.rmdirSync(tmpDir);
-  }
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 }

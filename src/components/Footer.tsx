@@ -5,18 +5,20 @@ import Clickable from './common/ClickManager.js';
 import { theme } from '../theme/theme.js';
 
 export interface FooterProps {
-  isConnected?: boolean;
   activePanel?: ActivePanel;
   width?: number;
   onToggleHelp?: () => void;
+  onEditProfile?: () => void;
+  onNewProfile?: () => void;
   onSwitchConfig?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = React.memo(({ 
-  isConnected = true, 
   activePanel = 'services', 
   width = 120,
   onToggleHelp,
+  onEditProfile,
+  onNewProfile,
   onSwitchConfig
 }) => {
   const isNarrow = width < 85;
@@ -82,6 +84,24 @@ export const Footer: React.FC<FooterProps> = React.memo(({
         </Box>
         <Text color={theme.colors.textSecondary}>Panel </Text>
 
+        {onEditProfile && (
+          <Clickable onClick={() => onEditProfile()} flexDirection="row">
+            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
+              <Text color={theme.colors.accent} bold>e</Text>
+            </Box>
+            <Text color={theme.colors.accent}>Edit </Text>
+          </Clickable>
+        )}
+
+        {onNewProfile && (
+          <Clickable onClick={() => onNewProfile()} flexDirection="row">
+            <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
+              <Text color={theme.colors.accent} bold>n</Text>
+            </Box>
+            <Text color={theme.colors.accent}>New </Text>
+          </Clickable>
+        )}
+
         {onSwitchConfig && (
           <Clickable onClick={() => onSwitchConfig?.()} flexDirection="row">
             <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
@@ -92,13 +112,6 @@ export const Footer: React.FC<FooterProps> = React.memo(({
         )}
       </Box>
 
-      {/* Right connection indicator */}
-      <Box flexDirection="row" alignItems="center" flexShrink={0} marginLeft={1}>
-        <Text color={isConnected ? theme.colors.running : theme.colors.stopped}>● </Text>
-        <Text color={isConnected ? theme.colors.running : theme.colors.stopped} bold>
-          {isConnected ? 'Connected' : 'Offline'}
-        </Text>
-      </Box>
     </Box>
   );
 });

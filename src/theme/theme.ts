@@ -3,6 +3,16 @@
  * Modern, high-contrast, professional developer terminal UI tokens
  */
 
+const colorsDisabled =
+  'NO_COLOR' in process.env ||
+  process.env.FORCE_COLOR === '0' ||
+  process.env.FORCE_COLOR === 'false' ||
+  process.env.TERM === 'dumb';
+const trueColorSupported = !colorsDisabled && (
+  /^(truecolor|24bit)$/i.test(process.env.COLORTERM || '') ||
+  /(?:direct|truecolor|kitty|wezterm|alacritty|foot)/i.test(process.env.TERM || '')
+);
+
 export const theme = {
   colors: {
     // Canvas & Surfaces (Refined Midnight Slate Palette)
@@ -53,9 +63,9 @@ export const theme = {
   ansi: {
     canvasRgb: [11, 15, 25] as const,
     // OSC 11 + 24-bit TrueColor Background Color Erase (\x1b[48;2;11;15;25m\x1b[2J)
-    setCanvasBg: '\x1b]11;#0B0F19\x07\x1b[48;2;11;15;25m\x1b[2J',
+    setCanvasBg: trueColorSupported ? '\x1b]11;#0B0F19\x07\x1b[48;2;11;15;25m\x1b[2J' : '',
     // OSC 111 + ANSI Attribute Reset (\x1b[0m\x1b[2J)
-    resetCanvasBg: '\x1b]111\x07\x1b[0m\x1b[2J',
+    resetCanvasBg: trueColorSupported ? '\x1b]111\x07\x1b[0m\x1b[2J' : '',
   }
 } as const;
 

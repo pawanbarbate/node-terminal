@@ -7,6 +7,7 @@ import useSpinner from '../hooks/useSpinner.js';
 
 export interface ServiceDetailPanelProps {
   service?: Service;
+  hasConfiguredProfile?: boolean;
   activeTab?: ActiveTab;
   isRestarting?: boolean;
   maxLogs?: number;
@@ -30,6 +31,7 @@ const cleanPort = (p?: string | number) => {
 
 export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(({ 
   service, 
+  hasConfiguredProfile = false,
   activeTab = 'logs', 
   isRestarting = false, 
   maxLogs = 6,
@@ -43,7 +45,28 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
   onSelectTab,
   onFocus
 }) => {
-  if (!service) return null;
+  if (!service) {
+    return (
+      <Clickable
+        onClick={() => onFocus?.()}
+        borderStyle="round"
+        borderColor={isFocused ? theme.colors.borderFocus : theme.colors.borderDefault}
+        borderBackgroundColor={theme.colors.canvas}
+        backgroundColor={theme.colors.surface}
+        flexDirection="column"
+        justifyContent="center"
+        paddingX={1}
+        width={panelWidth}
+        height={height}
+        marginBottom={1}
+      >
+        <Text color={theme.colors.textSecondary} bold>
+          {hasConfiguredProfile ? 'No services configured in this profile.' : 'No service profile configured.'}
+        </Text>
+        <Text color={theme.colors.textMuted}>Press e to configure this profile or n to create a new profile.</Text>
+      </Clickable>
+    );
+  }
 
   const isNarrow = panelWidth < 65;
   const innerWidth = Math.max(20, panelWidth - 4);
@@ -150,7 +173,7 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
     return <Text color={theme.colors.textPrimary}>{truncated}</Text>;
   };
 
-  const allLogs = service.logs || [];
+  const allLogs = activeTab === 'errors' ? service.errorLogs || [] : service.logs || [];
   const totalLogs = allLogs.length;
   const maxScroll = Math.max(0, totalLogs - maxLogs);
   const effectiveOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
@@ -315,19 +338,19 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
               </Box>
             </Clickable>
 
-            {/* Metrics Tab */}
+            {/* Process Tab */}
             <Clickable 
               onClick={() => {
                 onFocus?.();
-                onSelectTab?.('metrics');
+                onSelectTab?.('process');
               }}
             >
-              <Box 
-                backgroundColor={activeTab === 'metrics' ? theme.colors.card : undefined} 
+              <Box
+                backgroundColor={activeTab === 'process' ? theme.colors.card : undefined}
                 paddingX={1}
               >
-                <Text color={activeTab === 'metrics' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'metrics'}>
-                  [ Metrics ]
+                <Text color={activeTab === 'process' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'process'}>
+                  [ Process ]
                 </Text>
               </Box>
             </Clickable>
@@ -343,14 +366,18 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
       {/* 5. Tab Content */}
       {activeTab === 'logs' && (
         <Box flexDirection="column">
-          {visibleLogs.map((log, index) => (
+          {visibleLogs.length === 0 ? (
+            <Text color={theme.colors.textMuted}>No logs captured for {service.name} yet.</Text>
+          ) : visibleLogs.map((log, index) => (
             <Box key={index} flexDirection="row" alignItems="center" flexWrap="nowrap">
               <Box width={9} flexShrink={0}>
                 <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
               </Box>
               <Box flexShrink={0} marginRight={1}>
                 <Text color={theme.colors.textDim}>[</Text>
-                <Text color={theme.colors.accent} bold>INFO </Text>
+                <Text color={(log.level === 'error' || log.level === 'ERROR') ? theme.colors.stopped : (log.level === 'warn' || log.level === 'WARN') ? theme.colors.warning : theme.colors.accent} bold>
+                  {(log.level || 'info').toUpperCase()}
+                </Text>
                 <Text color={theme.colors.textDim}>] </Text>
               </Box>
               <Box flexGrow={1} flexShrink={1}>
@@ -364,7 +391,7 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
       {activeTab === 'errors' && (
         <Box flexDirection="column">
           {service.errorLogs && service.errorLogs.length > 0 ? (
-            service.errorLogs.slice(0, maxLogs).map((err, i) => (
+            visibleLogs.map((err, i) => (
               <Box key={i} flexDirection="row" alignItems="center" flexWrap="nowrap">
                 <Box width={9} flexShrink={0}>
                   <Text color={theme.colors.textMuted}>{err.timestamp} </Text>
@@ -381,25 +408,29 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
             ))
           ) : (
             <Box>
-              <Text color={theme.colors.running}>✔ No active errors logged for {service.name}</Text>
+              <Text color={theme.colors.textMuted}>No errors captured for {service.name}.</Text>
             </Box>
           )}
         </Box>
       )}
 
-      {activeTab === 'metrics' && (
+      {activeTab === 'process' && (
         <Box flexDirection="column">
           <Box justifyContent="space-between" width={Math.min(45, innerWidth)} flexWrap="nowrap">
-            <Text color={theme.colors.textSecondary}>CPU Utilization:</Text>
-            <Text color={theme.colors.textPrimary} bold>{service.metrics?.cpu || '12%'}</Text>
+            <Text color={theme.colors.textSecondary}>Status</Text>
+            <Text color={status.fg} bold>{service.statusText || service.status.toUpperCase()}</Text>
           </Box>
           <Box justifyContent="space-between" width={Math.min(45, innerWidth)} flexWrap="nowrap">
-            <Text color={theme.colors.textSecondary}>Memory RSS:</Text>
-            <Text color={theme.colors.textPrimary} bold>{service.metrics?.memory || '120 MB'}</Text>
+            <Text color={theme.colors.textSecondary}>Process ID</Text>
+            <Text color={theme.colors.textPrimary} bold>{service.pid}</Text>
           </Box>
           <Box justifyContent="space-between" width={Math.min(45, innerWidth)} flexWrap="nowrap">
-            <Text color={theme.colors.textSecondary}>Latency P50/P99:</Text>
-            <Text color={theme.colors.accent} bold>{service.metrics?.p50 || '18ms'}/{service.metrics?.p99 || '45ms'}</Text>
+            <Text color={theme.colors.textSecondary}>Uptime</Text>
+            <Text color={theme.colors.textPrimary} bold>{service.uptime}</Text>
+          </Box>
+          <Box flexDirection="column" width={Math.min(45, innerWidth)}>
+            <Text color={theme.colors.textSecondary}>Working directory</Text>
+            <Text color={theme.colors.textPrimary} wrap="truncate-end">{service.path || 'Not configured'}</Text>
           </Box>
         </Box>
       )}

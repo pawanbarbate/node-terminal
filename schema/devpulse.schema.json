@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/pawanbarbate/node-terminal/main/schema/devpulse.schema.json",
+  "title": "DevPulse configuration",
+  "description": "Configuration for services started and monitored by the local DevPulse terminal application.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "bootStaggerMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxConcurrentBoot": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/service"
+      }
+    }
+  },
+  "required": [
+    "services"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "command": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            }
+          ]
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "preStart": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "autoStart": {
+          "type": "boolean"
+        },
+        "readyPattern": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "path"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "command"
+          ]
+        },
+        {
+          "required": [
+            "commands"
+          ]
+        },
+        {
+          "required": [
+            "preStart"
+          ]
+        }
+      ],
+      "additionalProperties": true
+    }
+  }
+}

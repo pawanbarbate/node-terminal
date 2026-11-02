@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useInput } from 'ink';
-import { DashboardState, DashboardAction, FILTER_OPTIONS } from '../state/dashboardReducer.js';
+import { DashboardState, DashboardAction } from '../state/dashboardReducer.js';
 import { ViewportInfo } from '../types/index.js';
 import { ClickManagerContextValue } from '../components/common/ClickManager.js';
 
@@ -12,6 +12,8 @@ interface UseTerminalInputProps {
   clickManagerRef?: React.RefObject<ClickManagerContextValue | null>;
   onRestart?: (index: number) => void;
   onToggleStop?: (index: number) => void;
+  onEditProfile?: () => void;
+  onNewProfile?: () => void;
   onSwitchConfig?: () => void;
 }
 
@@ -23,6 +25,8 @@ export function useTerminalInput({
   clickManagerRef,
   onRestart,
   onToggleStop,
+  onEditProfile,
+  onNewProfile,
   onSwitchConfig
 }: UseTerminalInputProps) {
   const lastServiceNavTimeRef = useRef(0);
@@ -39,6 +43,19 @@ export function useTerminalInput({
 
   const onSwitchConfigRef = useRef(onSwitchConfig);
   onSwitchConfigRef.current = onSwitchConfig;
+  const onEditProfileRef = useRef(onEditProfile);
+  onEditProfileRef.current = onEditProfile;
+  const onNewProfileRef = useRef(onNewProfile);
+  onNewProfileRef.current = onNewProfile;
+
+  const getServiceLogCount = () => {
+    const service = state.services[state.selectedIndex];
+    return state.activeTab === 'errors'
+      ? service?.errorLogs?.length || 0
+      : service?.logs?.length || 0;
+  };
+  const getServiceMaxScroll = () => Math.max(0, getServiceLogCount() - (viewport.maxServiceLogs || 6));
+  const getGlobalMaxScroll = () => Math.max(0, state.globalLogs.length - (viewport.maxGlobalLogs || 6));
 
   useInput((input, key) => {
     // -------------------------------------------------------------
@@ -99,7 +116,7 @@ export function useTerminalInput({
               lastLogScrollTimeRef.current = now;
               const detailEndRow = 1 + viewport.detailPanelHeight;
               if (mouseY <= detailEndRow) {
-                const totalLogs = state.services[state.selectedIndex]?.logs?.length || 0;
+                const totalLogs = getServiceLogCount();
                 const maxScroll = Math.max(0, totalLogs - (viewport.maxServiceLogs || 6));
                 dispatch({ type: 'SCROLL_SERVICE_LOGS', delta: 1, maxScroll });
               } else {
@@ -125,7 +142,7 @@ export function useTerminalInput({
               lastLogScrollTimeRef.current = now;
               const detailEndRow = 1 + viewport.detailPanelHeight;
               if (mouseY <= detailEndRow) {
-                const totalLogs = state.services[state.selectedIndex]?.logs?.length || 0;
+                const totalLogs = getServiceLogCount();
                 const maxScroll = Math.max(0, totalLogs - (viewport.maxServiceLogs || 6));
                 dispatch({ type: 'SCROLL_SERVICE_LOGS', delta: -1, maxScroll });
               } else {
@@ -145,7 +162,7 @@ export function useTerminalInput({
           if (state.activePanel === 'services') {
             dispatch({ type: 'NAVIGATE_SERVICES', delta: -1 });
           } else if (state.activePanel === 'serviceLogs') {
-            const totalLogs = state.services[state.selectedIndex]?.logs?.length || 0;
+            const totalLogs = getServiceLogCount();
             const maxScroll = Math.max(0, totalLogs - (viewport.maxServiceLogs || 6));
             dispatch({ type: 'SCROLL_SERVICE_LOGS', delta: 1, maxScroll });
           } else if (state.activePanel === 'globalLogs') {
@@ -158,7 +175,7 @@ export function useTerminalInput({
           if (state.activePanel === 'services') {
             dispatch({ type: 'NAVIGATE_SERVICES', delta: 1 });
           } else if (state.activePanel === 'serviceLogs') {
-            const totalLogs = state.services[state.selectedIndex]?.logs?.length || 0;
+            const totalLogs = getServiceLogCount();
             const maxScroll = Math.max(0, totalLogs - (viewport.maxServiceLogs || 6));
             dispatch({ type: 'SCROLL_SERVICE_LOGS', delta: -1, maxScroll });
           } else if (state.activePanel === 'globalLogs') {
@@ -232,16 +249,6 @@ export function useTerminalInput({
       }
     }
 
-    // Helpers for calculating dynamic maxScroll bounds
-    const getServiceMaxScroll = () => {
-      const totalLogs = state.services[state.selectedIndex]?.logs?.length || 0;
-      return Math.max(0, totalLogs - (viewport.maxServiceLogs || 6));
-    };
-
-    const getGlobalMaxScroll = () => {
-      return Math.max(0, state.globalLogs.length - (viewport.maxGlobalLogs || 6));
-    };
-
     // PageUp / PageDown or '[' / ']' for keyboard log scrolling
     if (key.pageUp || input === '[') {
       if (state.activePanel === 'globalLogs') {
@@ -307,9 +314,9 @@ export function useTerminalInput({
     // Tabs switching (1-3 or left/right arrow)
     if (input === '1') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'logs' }); return; }
     if (input === '2') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'errors' }); return; }
-    if (input === '3') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'metrics' }); return; }
+    if (input === '3') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'process' }); return; }
 
-    const tabs: ('logs' | 'errors' | 'metrics')[] = ['logs', 'errors', 'metrics'];
+    const tabs: ('logs' | 'errors' | 'process')[] = ['logs', 'errors', 'process'];
     if (key.leftArrow) {
       const curIdx = tabs.indexOf(state.activeTab);
       dispatch({ type: 'SET_ACTIVE_TAB', tab: tabs[Math.max(0, curIdx - 1)] });
@@ -331,6 +338,16 @@ export function useTerminalInput({
       return;
     }
 
+    if (input === 'e' || input === 'E') {
+      onEditProfileRef.current?.();
+      return;
+    }
+
+    if (input === 'n' || input === 'N') {
+      onNewProfileRef.current?.();
+      return;
+    }
+
     // Switch configuration profile
     if (input === 'p' || input === 'P') {
       if (onSwitchConfigRef.current) {
@@ -349,11 +366,5 @@ export function useTerminalInput({
       return;
     }
 
-    // Live toggle
-    if (input === 'l' || input === ' ') {
-      dispatch({ type: 'TOGGLE_LIVE' });
-      return;
-    }
   });
 }
-

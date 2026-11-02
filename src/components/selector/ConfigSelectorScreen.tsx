@@ -4,6 +4,7 @@ import { ConfigFileSummary } from '../../services/configManager.js';
 import { Header } from '../Header.js';
 import { ClickProvider, Clickable, ClickManagerContextValue } from '../common/ClickManager.js';
 import { useTerminalViewport } from '../../hooks/useTerminalViewport.js';
+import TerminalSizeNotice from '../TerminalSizeNotice.js';
 import { theme } from '../../theme/theme.js';
 
 export interface ConfigSelectorScreenProps {
@@ -56,13 +57,6 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
       setTime(new Date().toTimeString().split(' ')[0] || '12:00:00');
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // Assert SGR mouse reporting mode on mount
-  useEffect(() => {
-    try {
-      process.stdout.write('\x1b[?1000h\x1b[?1006h');
-    } catch {}
   }, []);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -248,6 +242,10 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
   const hiddenAbove = windowStart;
   const hiddenBelow = configs.length - windowEnd;
 
+  if (viewport.isTooSmall) {
+    return <TerminalSizeNotice width={viewport.width} height={viewport.height} />;
+  }
+
   return (
     <ClickProvider clickManagerRef={clickManagerRef}>
       <Box
@@ -320,9 +318,11 @@ export const ConfigSelectorScreen: React.FC<ConfigSelectorScreenProps> = ({
                   <Clickable
                     key={cfg.path}
                     id={`config-card-${idx}`}
+                    disabled={!cfg.isValid}
                     width={`${100 / columns}%`}
                     paddingRight={columns === 2 && column === 0 ? 1 : 0}
                     onClick={() => {
+                      if (!cfg.isValid) return;
                       updateSelection(idx);
                       onSelect(cfg.path);
                     }}

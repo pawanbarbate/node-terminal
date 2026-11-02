@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../theme/theme.js';
+import { appVersion } from '../version.js';
 
 export interface HeaderProps {
   time?: string;
@@ -9,12 +10,17 @@ export interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({ 
-  time = '10:24:17', 
-  systemStatus = 'All Systems Running',
+  time = '00:00:00',
+  systemStatus = 'No services configured',
   width = 120
 }) => {
   const isNarrow = width < 95;
   const isVeryNarrow = width < 75;
+  const statusColor = systemStatus === 'All services running'
+    ? theme.colors.running
+    : systemStatus === 'No services configured'
+      ? theme.colors.textMuted
+      : theme.colors.warning;
 
   return (
     <Box 
@@ -41,17 +47,17 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         {!isVeryNarrow && (
           <>
             <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
-              <Text color={theme.colors.textSecondary}>v0.1.0</Text>
+              <Text color={theme.colors.textSecondary}>v{appVersion}</Text>
             </Box>
             <Text color={theme.colors.textDim}>│ </Text>
           </>
         )}
         <Text color={theme.colors.textSecondary}>🕒 {time}</Text>
         <Text color={theme.colors.textDim}> │ </Text>
-        <Text color={theme.colors.running}>● </Text>
-        <Text color={theme.colors.running} bold>
-          {isNarrow 
-            ? (systemStatus === 'All Systems Running' ? 'Running' : systemStatus.replace('Workspace ', '')) 
+        <Text color={statusColor}>● </Text>
+        <Text color={statusColor} bold>
+          {isNarrow
+            ? (systemStatus === 'All services running' ? 'Running' : systemStatus.replace('Workspace ', ''))
             : systemStatus}
         </Text>
       </Box>
@@ -60,4 +66,3 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 });
 
 export default Header;
-

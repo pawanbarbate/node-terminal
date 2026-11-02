@@ -32,7 +32,6 @@ async function runRealLogStreamTest() {
         name: 'backend-worker',
         path: '.',
         command: 'node -e "console.log(\'WORKER_BOOTED_SUCCESS\'); setInterval(() => console.log(\'WORKER_BEAT\'), 300);"',
-        port: 5050,
         autoStart: true
       }
     ]
@@ -65,4 +64,3 @@ runRealLogStreamTest().catch(err => {
   processManager.stopAllSync();
   process.exit(1);
 });
-

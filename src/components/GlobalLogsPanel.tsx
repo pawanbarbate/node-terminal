@@ -9,7 +9,6 @@ export interface GlobalLogsPanelProps {
   searchQuery?: string;
   isSearching?: boolean;
   activeFilter?: string;
-  isLive?: boolean;
   maxLogs?: number;
   isFocused?: boolean;
   scrollOffset?: number;
@@ -17,7 +16,6 @@ export interface GlobalLogsPanelProps {
   height?: number;
   onToggleSearch?: () => void;
   onCycleFilter?: () => void;
-  onToggleLive?: () => void;
   onFocus?: () => void;
 }
 
@@ -26,7 +24,6 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
   searchQuery = '', 
   isSearching = false, 
   activeFilter = 'All Services', 
-  isLive = true,
   maxLogs = 6,
   isFocused = false,
   scrollOffset = 0,
@@ -34,7 +31,6 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
   height,
   onToggleSearch,
   onCycleFilter,
-  onToggleLive,
   onFocus
 }) => {
   const isNarrow = panelWidth < 65;
@@ -180,21 +176,6 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
             </Box>
           </Clickable>
 
-          {/* Live badge pill */}
-          <Clickable onClick={() => onToggleLive?.()}>
-            <Box 
-              backgroundColor={isLive ? theme.colors.runningBg : theme.colors.warningBg} 
-              paddingX={1}
-              flexShrink={0}
-            >
-              <Text 
-                color={isLive ? theme.colors.running : theme.colors.warning} 
-                bold
-              >
-                [ ● {isLive ? 'Live' : 'Off'} ]
-              </Text>
-            </Box>
-          </Clickable>
         </Box>
       </Box>
 
@@ -205,7 +186,9 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
 
       {/* Global Logs Stream */}
       <Box flexDirection="column" marginTop={0}>
-        {visibleLogs.map((log) => {
+        {visibleLogs.length === 0 ? (
+          <Text color={theme.colors.textMuted}>No logs captured yet.</Text>
+        ) : visibleLogs.map((log) => {
           const badge = getServiceBadgeStyle(log.service);
 
           return (

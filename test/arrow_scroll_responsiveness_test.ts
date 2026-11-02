@@ -136,7 +136,6 @@ console.log('--- STARTING ARROW KEY SCROLL & RESPONSIVENESS TESTS ---');
     port: `:300${i}`,
     pid: `${100 + i}`,
     errors: 0,
-    metrics: { cpu: '1%', memory: '50MB', p50: '5ms', p99: '10ms', requests: '10' },
     logs: [],
     errorLogs: []
   }));
@@ -187,4 +186,3 @@ console.log('--- STARTING ARROW KEY SCROLL & RESPONSIVENESS TESTS ---');
 }
 
 console.log('\n✅ ALL ARROW KEY SCROLL & RESPONSIVENESS TESTS PASSED PERFECTLY!\n');
-

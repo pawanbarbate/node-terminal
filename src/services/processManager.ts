@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import net from 'net';
@@ -13,6 +13,21 @@ interface ActiveProcessInfo {
   pid: number;
   stdoutRemainder: string;
   stderrRemainder: string;
+  readinessBuffer: string;
+  isReady: boolean;
+}
+
+const MAX_LOG_LINE_CHARS = 8192;
+
+function getChildColorEnvironment(): Record<string, string> {
+  const disableColor =
+    'NO_COLOR' in process.env ||
+    process.env.FORCE_COLOR === '0' ||
+    process.env.FORCE_COLOR === 'false' ||
+    process.env.TERM === 'dumb';
+  return disableColor
+    ? { NO_COLOR: process.env.NO_COLOR ?? '', FORCE_COLOR: '0' }
+    : { FORCE_COLOR: '1' };
 }
 
 class ProcessManager {
@@ -30,27 +45,99 @@ class ProcessManager {
     return `${hh}:${mm}:${ss}`;
   }
 
+  private appendOutputChunk(
+    serviceName: string,
+    remainder: string,
+    chunk: string,
+    level: 'info' | 'error',
+    callbacks: ProcessCallbacks,
+    prefix = ''
+  ): string {
+    const text = remainder + chunk;
+    let lineStart = 0;
+    let lineEnd = text.indexOf('\n');
+
+    while (lineEnd !== -1) {
+      const line = text.slice(lineStart, lineEnd).replace(/\r$/, '');
+      this.emitOutputLine(serviceName, line, level, callbacks, prefix);
+      lineStart = lineEnd + 1;
+      lineEnd = text.indexOf('\n', lineStart);
+    }
+
+    let pending = text.slice(lineStart);
+    while (pending.length >= MAX_LOG_LINE_CHARS) {
+      this.emitOutputLine(serviceName, pending.slice(0, MAX_LOG_LINE_CHARS), level, callbacks, prefix);
+      pending = pending.slice(MAX_LOG_LINE_CHARS);
+    }
+    return pending;
+  }
+
+  private emitOutputLine(
+    serviceName: string,
+    line: string,
+    level: 'info' | 'error',
+    callbacks: ProcessCallbacks,
+    prefix = ''
+  ): void {
+    if (!line.trim()) return;
+    const chunkLength = MAX_LOG_LINE_CHARS - prefix.length;
+    for (let offset = 0; offset < line.length; offset += chunkLength) {
+      callbacks.onLog(serviceName, {
+        id: `${level === 'error' ? 'err' : 'out'}-${serviceName}-${Date.now()}-${this.logCounter++}`,
+        timestamp: this.formatTime(),
+        service: serviceName,
+        message: `${prefix}${line.slice(offset, offset + chunkLength)}`,
+        level
+      });
+    }
+  }
+
   /**
    * Kill an entire process group cleanly across POSIX and Windows
    */
   private killProcessTree(pid: number, signal: NodeJS.Signals = 'SIGTERM') {
     if (process.platform === 'win32') {
       try {
-        const { execSync } = require('child_process');
-        execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' });
+        execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
       } catch {}
     } else {
       try {
         // Negative PID targets the entire process group
         process.kill(-pid, signal);
-      } catch (err: any) {
-        if (err.code !== 'ESRCH') {
+      } catch (err) {
+        const error = err as NodeJS.ErrnoException;
+        if (error.code !== 'ESRCH') {
           try {
             process.kill(pid, signal);
           } catch {}
         }
       }
     }
+  }
+
+  private isProcessTreeAlive(pid: number): boolean {
+    try {
+      process.kill(process.platform === 'win32' ? pid : -pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+    }
+  }
+
+  private delay(ms: number, signal?: AbortSignal): Promise<boolean> {
+    if (signal?.aborted) return Promise.resolve(false);
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve(true);
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        resolve(false);
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
   }
 
   /**
@@ -63,9 +150,15 @@ class ProcessManager {
     totalSteps: number,
     cwd: string,
     env: Record<string, string>,
-    callbacks: ProcessCallbacks
+    callbacks: ProcessCallbacks,
+    signal?: AbortSignal
   ): Promise<{ exitCode: number | null }> {
     return new Promise((resolve) => {
+      if (signal?.aborted) {
+        resolve({ exitCode: null });
+        return;
+      }
+
       callbacks.onStatusChange(service.name, 'starting', undefined, undefined, `STEP ${stepIndex + 1}/${totalSteps}`);
       callbacks.onLog(service.name, {
         id: `step-${service.name}-${Date.now()}-${this.logCounter++}`,
@@ -78,48 +171,37 @@ class ProcessManager {
       const child = spawn(cmd, {
         cwd,
         shell: true,
+        detached: process.platform !== 'win32',
         env: {
           ...process.env,
           ...env,
-          FORCE_COLOR: '1'
+          ...getChildColorEnvironment()
         }
       });
+      let abortKillTimer: NodeJS.Timeout | undefined;
+      const abortChild = () => {
+        if (!child.pid) return;
+        this.killProcessTree(child.pid, 'SIGTERM');
+        abortKillTimer = setTimeout(() => {
+          if (child.pid && child.exitCode === null) this.killProcessTree(child.pid, 'SIGKILL');
+        }, 800);
+      };
 
       let stdoutRemainder = '';
+      let stderrRemainder = '';
       child.stdout?.on('data', (chunk: Buffer) => {
-        stdoutRemainder += chunk.toString();
-        const lines = stdoutRemainder.split(/\r?\n/);
-        stdoutRemainder = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          callbacks.onLog(service.name, {
-            id: `out-${service.name}-${Date.now()}-${this.logCounter++}`,
-            timestamp: this.formatTime(),
-            service: service.name,
-            message: `  ${line}`,
-            level: 'info'
-          });
-        }
+        stdoutRemainder = this.appendOutputChunk(service.name, stdoutRemainder, chunk.toString(), 'info', callbacks, '  ');
       });
 
-      let stderrRemainder = '';
       child.stderr?.on('data', (chunk: Buffer) => {
-        stderrRemainder += chunk.toString();
-        const lines = stderrRemainder.split(/\r?\n/);
-        stderrRemainder = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          callbacks.onLog(service.name, {
-            id: `err-${service.name}-${Date.now()}-${this.logCounter++}`,
-            timestamp: this.formatTime(),
-            service: service.name,
-            message: `  ${line}`,
-            level: 'error'
-          });
-        }
+        stderrRemainder = this.appendOutputChunk(service.name, stderrRemainder, chunk.toString(), 'error', callbacks, '  ');
       });
 
       child.on('close', (code) => {
+        signal?.removeEventListener('abort', abortChild);
+        if (abortKillTimer) clearTimeout(abortKillTimer);
+        this.emitOutputLine(service.name, stdoutRemainder, 'info', callbacks, '  ');
+        this.emitOutputLine(service.name, stderrRemainder, 'error', callbacks, '  ');
         if (code === 0) {
           callbacks.onLog(service.name, {
             id: `step-done-${service.name}-${Date.now()}-${this.logCounter++}`,
@@ -141,6 +223,8 @@ class ProcessManager {
       });
 
       child.on('error', (err) => {
+        signal?.removeEventListener('abort', abortChild);
+        if (abortKillTimer) clearTimeout(abortKillTimer);
         callbacks.onLog(service.name, {
           id: `step-err-${service.name}-${Date.now()}-${this.logCounter++}`,
           timestamp: this.formatTime(),
@@ -150,6 +234,9 @@ class ProcessManager {
         });
         resolve({ exitCode: -1 });
       });
+
+      signal?.addEventListener('abort', abortChild, { once: true });
+      if (signal?.aborted) abortChild();
     });
   }
 
@@ -182,27 +269,39 @@ class ProcessManager {
   public async waitForServiceReady(
     service: ServiceConfig,
     timeoutMs = 15000,
-    pollIntervalMs = 250
+    pollIntervalMs = 250,
+    signal?: AbortSignal
   ): Promise<boolean> {
     const startTime = Date.now();
+
+    if (service.readyPattern) {
+      while (Date.now() - startTime < timeoutMs) {
+        if (signal?.aborted) return false;
+        const info = this.activeProcesses.get(service.name);
+        if (!info) return false;
+        if (info.isReady) return true;
+        if (!await this.delay(pollIntervalMs, signal)) return false;
+      }
+      return false;
+    }
 
     // If service has a configured port, wait until the TCP port is listening
     if (service.port && typeof service.port === 'number') {
       while (Date.now() - startTime < timeoutMs) {
-        if (!this.activeProcesses.has(service.name)) {
+        if (signal?.aborted || !this.activeProcesses.has(service.name)) {
           return false;
         }
         const isOpen = await this.probeTcpPort(service.port);
         if (isOpen) {
           return true;
         }
-        await new Promise(r => setTimeout(r, pollIntervalMs));
+        if (!await this.delay(pollIntervalMs, signal)) return false;
       }
       return false;
     }
 
     // Default: verify process spawned and running
-    await new Promise(r => setTimeout(r, 400));
+    if (!await this.delay(400, signal)) return false;
     return this.activeProcesses.has(service.name);
   }
 
@@ -211,9 +310,11 @@ class ProcessManager {
    */
   public async startService(
     service: ServiceConfig,
-    callbacks: ProcessCallbacks
+    callbacks: ProcessCallbacks,
+    signal?: AbortSignal
   ): Promise<number | null> {
     this.knownConfigs.set(service.name, service);
+    if (signal?.aborted) return null;
 
     // If already running, return existing PID
     if (this.activeProcesses.has(service.name)) {
@@ -237,6 +338,24 @@ class ProcessManager {
       return null;
     }
 
+    const unavailableDependency = (service.dependsOn || []).find(dependency => {
+      const dependencyConfig = Array.from(this.knownConfigs.values())
+        .find(config => config.name.toLowerCase() === dependency.toLowerCase());
+      return !dependencyConfig || !this.activeProcesses.has(dependencyConfig.name);
+    });
+    if (unavailableDependency) {
+      const error = `Dependency "${unavailableDependency}" is not running`;
+      callbacks.onStatusChange(service.name, 'blocked', undefined, error, `BLOCKED (${unavailableDependency})`);
+      callbacks.onLog(service.name, {
+        id: `blocked-${service.name}-${Date.now()}-${this.logCounter++}`,
+        timestamp: this.formatTime(),
+        service: service.name,
+        message: `✖ ${error}; start it before "${service.name}".`,
+        level: 'error'
+      });
+      return null;
+    }
+
     callbacks.onStatusChange(service.name, 'starting');
 
     const customEnv: Record<string, string> = {};
@@ -248,8 +367,9 @@ class ProcessManager {
     if (pipeline.preCommands.length > 0) {
       for (let i = 0; i < pipeline.preCommands.length; i++) {
         const cmd = pipeline.preCommands[i]!;
-        const res = await this.runPreCommand(service, cmd, i, pipeline.totalSteps, resolvedCwd, customEnv, callbacks);
+        const res = await this.runPreCommand(service, cmd, i, pipeline.totalSteps, resolvedCwd, customEnv, callbacks, signal);
         if (res.exitCode !== 0) {
+          if (signal?.aborted) return null;
           callbacks.onStatusChange(
             service.name,
             'stopped',
@@ -276,6 +396,20 @@ class ProcessManager {
     }
 
     try {
+      if (signal?.aborted) return null;
+      if (service.port && await this.probeTcpPort(service.port)) {
+        const error = `Port ${service.port} is already in use`;
+        callbacks.onLog(service.name, {
+          id: `port-${service.name}-${Date.now()}-${this.logCounter++}`,
+          timestamp: this.formatTime(),
+          service: service.name,
+          message: `✖ ${error}`,
+          level: 'error'
+        });
+        callbacks.onStatusChange(service.name, 'stopped', undefined, error);
+        return null;
+      }
+      if (signal?.aborted) return null;
       callbacks.onStatusChange(
         service.name,
         'starting',
@@ -290,7 +424,7 @@ class ProcessManager {
         env: {
           ...process.env,
           ...customEnv,
-          FORCE_COLOR: '1'
+          ...getChildColorEnvironment()
         },
         detached: process.platform !== 'win32'
       });
@@ -305,7 +439,9 @@ class ProcessManager {
         config: service,
         pid,
         stdoutRemainder: '',
-        stderrRemainder: ''
+        stderrRemainder: '',
+        readinessBuffer: '',
+        isReady: false
       };
 
       this.activeProcesses.set(service.name, info);
@@ -321,38 +457,26 @@ class ProcessManager {
 
       // Stream stdout line-by-line
       child.stdout?.on('data', (chunk: Buffer) => {
-        info.stdoutRemainder += chunk.toString();
-        const lines = info.stdoutRemainder.split(/\r?\n/);
-        info.stdoutRemainder = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          callbacks.onLog(service.name, {
-            id: `out-${service.name}-${Date.now()}-${this.logCounter++}`,
-            timestamp: this.formatTime(),
-            service: service.name,
-            message: line,
-            level: 'info'
-          });
-        }
+        this.checkReadinessPattern(info, chunk.toString());
+        info.stdoutRemainder = this.appendOutputChunk(
+          service.name,
+          info.stdoutRemainder,
+          chunk.toString(),
+          'info',
+          callbacks
+        );
       });
 
       // Stream stderr line-by-line
       child.stderr?.on('data', (chunk: Buffer) => {
-        info.stderrRemainder += chunk.toString();
-        const lines = info.stderrRemainder.split(/\r?\n/);
-        info.stderrRemainder = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          callbacks.onLog(service.name, {
-            id: `err-${service.name}-${Date.now()}-${this.logCounter++}`,
-            timestamp: this.formatTime(),
-            service: service.name,
-            message: line,
-            level: 'error'
-          });
-        }
+        this.checkReadinessPattern(info, chunk.toString());
+        info.stderrRemainder = this.appendOutputChunk(
+          service.name,
+          info.stderrRemainder,
+          chunk.toString(),
+          'error',
+          callbacks
+        );
       });
 
       // Error handler
@@ -432,6 +556,12 @@ class ProcessManager {
     }
   }
 
+  private checkReadinessPattern(info: ActiveProcessInfo, chunk: string): void {
+    if (info.isReady || !info.config.readyPattern) return;
+    info.readinessBuffer = (info.readinessBuffer + chunk).slice(-8192);
+    if (info.readinessBuffer.includes(info.config.readyPattern)) info.isReady = true;
+  }
+
   /**
    * Stop a single running service and notify callbacks
    */
@@ -446,47 +576,54 @@ class ProcessManager {
     }
 
     const { child, pid } = info;
-    this.activeProcesses.delete(serviceName);
 
     if (callbacks) {
-      callbacks.onStatusChange(serviceName, 'stopped');
       callbacks.onLog(serviceName, {
         id: `stop-${serviceName}-${Date.now()}-${this.logCounter++}`,
         timestamp: this.formatTime(),
         service: serviceName,
-        message: `■ Stopped service "${serviceName}" (PID: ${pid})`,
+        message: `■ Stopping service "${serviceName}" (PID: ${pid})`,
         level: 'info'
       });
     }
 
     return new Promise<boolean>((resolve) => {
       let resolved = false;
-      const done = () => {
+      let escalationTimer: NodeJS.Timeout | undefined;
+      let timeoutTimer: NodeJS.Timeout | undefined;
+      const done = (stopped: boolean) => {
         if (!resolved) {
           resolved = true;
-          resolve(true);
+          if (escalationTimer) clearTimeout(escalationTimer);
+          if (timeoutTimer) clearTimeout(timeoutTimer);
+          child.off('close', onClose);
+          resolve(stopped);
         }
       };
+      const onClose = () => done(true);
 
-      if (child.exitCode !== null || child.killed) {
-        done();
-        return;
-      }
-
-      child.once('close', done);
-      child.once('exit', done);
+      child.once('close', onClose);
 
       // Send SIGTERM to process group
-      this.killProcessTree(pid, 'SIGTERM');
+      if (child.exitCode === null && child.signalCode === null) {
+        this.killProcessTree(pid, 'SIGTERM');
+      }
 
       // Hard kill fallback after 800ms
-      setTimeout(() => {
+      escalationTimer = setTimeout(() => {
         if (!resolved) {
-          try {
-            process.kill(pid, 0);
+          if (this.isProcessTreeAlive(pid)) {
             this.killProcessTree(pid, 'SIGKILL');
-          } catch {}
-          setTimeout(done, 150);
+          } else {
+            done(true);
+            return;
+          }
+          timeoutTimer = setTimeout(() => {
+            if (callbacks) {
+              callbacks.onStatusChange(serviceName, 'warning', pid, 'Process did not exit after SIGKILL', 'STOP TIMEOUT');
+            }
+            done(false);
+          }, 1500);
         }
       }, 800);
     });
@@ -517,7 +654,8 @@ class ProcessManager {
     });
 
     // Wait until old process has actually exited
-    await this.stopService(serviceName, callbacks);
+    const stopped = await this.stopService(serviceName, callbacks);
+    if (!stopped) return null;
     await new Promise(r => setTimeout(r, 200));
 
     // Start fresh
@@ -531,7 +669,8 @@ class ProcessManager {
   public async startAll(
     services: ServiceConfig[], 
     callbacks: ProcessCallbacks,
-    settings?: OrchestratorSettings
+    settings?: OrchestratorSettings,
+    signal?: AbortSignal
   ): Promise<void> {
     for (const service of services) {
       this.knownConfigs.set(service.name, service);
@@ -539,6 +678,8 @@ class ProcessManager {
 
     const autoServices = services.filter(s => s.autoStart !== false);
     if (autoServices.length === 0) return;
+    const allServiceNames = new Set(services.map(service => service.name.toLowerCase()));
+    const autoServiceNames = new Set(autoServices.map(service => service.name.toLowerCase()));
 
     const bootStaggerMs = settings?.bootStaggerMs ?? 400;
     const maxConcurrentBoot = Math.max(1, settings?.maxConcurrentBoot ?? 2);
@@ -617,16 +758,24 @@ class ProcessManager {
         const service = tier[sIdx]!;
 
         // Check if any upstream dependency failed
+        if (signal?.aborted) return;
         const deps = service.dependsOn || [];
-        const failedDep = deps.find(d => failedServices.has(d.toLowerCase()));
+        const failedDep = deps.find(d =>
+          failedServices.has(d.toLowerCase()) ||
+          !allServiceNames.has(d.toLowerCase()) ||
+          !autoServiceNames.has(d.toLowerCase())
+        );
         if (failedDep) {
           failedServices.add(service.name.toLowerCase());
-          callbacks.onStatusChange(service.name, 'blocked', undefined, `Dependency ${failedDep} failed`, `BLOCKED (${failedDep})`);
+          const dependencyIsManual = allServiceNames.has(failedDep.toLowerCase()) &&
+            !autoServiceNames.has(failedDep.toLowerCase());
+          const reason = dependencyIsManual ? 'is configured for manual start' : 'failed or is missing';
+          callbacks.onStatusChange(service.name, 'blocked', undefined, `Dependency ${failedDep} ${reason}`, `BLOCKED (${failedDep})`);
           callbacks.onLog(service.name, {
             id: `blocked-${service.name}-${Date.now()}-${this.logCounter++}`,
             timestamp: this.formatTime(),
             service: service.name,
-            message: `✖ Blocked: Upstream dependency "${failedDep}" failed to start.`,
+            message: `✖ Blocked: Upstream dependency "${failedDep}" ${reason}.`,
             level: 'error'
           });
           continue;
@@ -634,24 +783,33 @@ class ProcessManager {
 
         // Wait for an available concurrency slot before proceeding
         await acquireSlot();
+        if (signal?.aborted) {
+          releaseSlot();
+          return;
+        }
 
         // Stagger spacing between consecutive process spawns in this wave
         if (sIdx > 0 && bootStaggerMs > 0) {
-          await new Promise(r => setTimeout(r, bootStaggerMs));
+          if (!await this.delay(bootStaggerMs, signal)) {
+            releaseSlot();
+            return;
+          }
         }
 
         // Start service
         const startPromise = (async () => {
           try {
-            const pid = await this.startService(service, callbacks);
+            const pid = await this.startService(service, callbacks, signal);
             if (pid === null) {
               failedServices.add(service.name.toLowerCase());
               return false;
             }
 
             // Wait for readiness before downstream tiers can proceed
-            const isReady = await this.waitForServiceReady(service);
+            const isReady = await this.waitForServiceReady(service, 15000, 250, signal);
             if (!isReady) {
+              if (signal?.aborted) return false;
+              await this.stopService(service.name, callbacks);
               failedServices.add(service.name.toLowerCase());
               callbacks.onLog(service.name, {
                 id: `warn-ready-${service.name}-${Date.now()}-${this.logCounter++}`,
@@ -688,20 +846,13 @@ class ProcessManager {
    * Asynchronously stop all active processes
    */
   public async stopAll(): Promise<void> {
-    const pids = Array.from(this.activeProcesses.values()).map(info => info.pid);
-    this.activeProcesses.clear();
-
-    for (const pid of pids) {
-      this.killProcessTree(pid, 'SIGTERM');
-    }
-
-    await new Promise(r => setTimeout(r, 200));
-
-    for (const pid of pids) {
-      try {
-        process.kill(pid, 0);
-        this.killProcessTree(pid, 'SIGKILL');
-      } catch {}
+    const serviceNames = Array.from(this.activeProcesses.keys());
+    const results = await Promise.all(serviceNames.map(async name => {
+      const stopped = await this.stopService(name);
+      return stopped || !this.activeProcesses.has(name);
+    }));
+    if (results.some(stopped => !stopped)) {
+      throw new Error('One or more child processes did not stop');
     }
   }
 

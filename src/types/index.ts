@@ -4,7 +4,7 @@ export type ServiceStatus = 'running' | 'stopped' | 'starting' | 'warning' | 'wa
 
 export type ActivePanel = 'services' | 'serviceLogs' | 'globalLogs';
 
-export type ActiveTab = 'logs' | 'errors' | 'metrics';
+export type ActiveTab = 'logs' | 'errors' | 'process';
 
 export type NarrowTab = 'services' | 'detail' | 'logs';
 
@@ -27,14 +27,6 @@ export interface LogEntry {
   serviceColor?: string;
 }
 
-export interface ServiceMetrics {
-  cpu?: string;
-  memory?: string;
-  p50?: string;
-  p99?: string;
-  requests?: string;
-}
-
 export interface Service {
   id: string;
   name: string;
@@ -48,7 +40,6 @@ export interface Service {
   port: string;
   pid: string;
   errors: number;
-  metrics?: ServiceMetrics;
   logs?: LogEntry[];
   errorLogs?: LogEntry[];
   rawConfig?: ServiceConfig;
@@ -59,14 +50,10 @@ export interface ProcessCallbacks {
   onStatusChange: (serviceName: string, status: ServiceStatus, pid?: number, error?: string, statusText?: string) => void;
 }
 
-export interface SystemMetrics {
-  cpu: number;
-  memoryUsed: number;
-  memoryTotal: number;
+export interface WorkspaceSummary {
   servicesRunning: number;
   servicesTotal: number;
   uptime: string;
-  errors1h: number;
 }
 
 export interface ViewportInfo {
@@ -74,6 +61,7 @@ export interface ViewportInfo {
   height: number;
   isWide: boolean;
   isUltraNarrow: boolean;
+  isTooSmall: boolean;
   isCompactHeight: boolean;
   isUltraCompactHeight: boolean;
   leftPanelWidth: number;
@@ -99,4 +87,3 @@ export interface SgrMouseEvent {
 }
 
 export * from './config.js';
-

@@ -47,14 +47,14 @@ async function runDashboardClickTests() {
   stdin.write('\x1b[<0;38;5M');
   await new Promise(r => setTimeout(r, 100));
 
-  // TEST 3: Click on "Metrics" tab in ServiceDetailPanel
-  console.log('[TEST 3] Sending SGR Left Click on "Metrics" tab (col 52, row 5)...');
+  // TEST 3: Click on "Process" tab in ServiceDetailPanel
+  console.log('[TEST 3] Sending SGR Left Click on "Process" tab (col 52, row 5)...');
   stdin.write('\x1b[<0;52;5M');
   await new Promise(r => setTimeout(r, 100));
 
-  // TEST 4: Click on "Live" badge in GlobalLogsPanel
-  // Global Logs header is around row 17-18, Live pill is on far right (col 93, row 17)
-  console.log('[TEST 4] Sending SGR Left Click on "Live" toggle pill in Global Logs...');
+  // TEST 4: Click on the global log filter control
+  // Global Logs header is around row 17-18, its filter control is on the right.
+  console.log('[TEST 4] Sending SGR Left Click on global log filter control...');
   stdin.write('\x1b[<0;93;17M');
   await new Promise(r => setTimeout(r, 100));
 
@@ -72,4 +72,3 @@ runDashboardClickTests().catch(err => {
   console.error('Error during dashboard click test:', err);
   process.exit(1);
 });
-

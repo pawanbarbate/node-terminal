@@ -7,6 +7,7 @@ import ServiceDetailPanel from './components/ServiceDetailPanel.js';
 import GlobalLogsPanel from './components/GlobalLogsPanel.js';
 import Footer from './components/Footer.js';
 import HelpModal from './components/HelpModal.js';
+import TerminalSizeNotice from './components/TerminalSizeNotice.js';
 import { createInitialDashboardState, dashboardReducer } from './state/dashboardReducer.js';
 import { useTerminalViewport } from './hooks/useTerminalViewport.js';
 import { useTerminalInput } from './hooks/useTerminalInput.js';
@@ -17,13 +18,14 @@ import { DevPulseConfig } from './types/config.js';
 
 export interface DevPulseProps {
   config?: DevPulseConfig;
-  onOpenConfig?: () => void;
+  onEditProfile?: () => void;
+  onNewProfile?: () => void;
   onSwitchConfig?: () => void;
   width?: number;
   height?: number;
 }
 
-export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwitchConfig, width, height }) => {
+export const DevPulse: React.FC<DevPulseProps> = ({ config, onEditProfile, onNewProfile, onSwitchConfig, width, height }) => {
   const { exit } = useApp();
   const [state, dispatch] = useReducer(dashboardReducer, config, createInitialDashboardState);
   const viewport = useTerminalViewport(width, height);
@@ -45,28 +47,33 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
     clickManagerRef,
     onRestart: handleRestart,
     onToggleStop: handleToggleStop,
+    onEditProfile,
+    onNewProfile,
     onSwitchConfig
   });
-
-  // Assert clean SGR mouse reporting mode on mount
-  useEffect(() => {
-    try {
-      process.stdout.write('\x1b[?1000h\x1b[?1006h');
-    } catch {}
-  }, []);
 
   // Time updater
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().toTimeString().split(' ')[0] || '12:00:00';
-      const cpuChange = Math.floor(Math.random() * 5) - 2;
-      dispatch({ type: 'TICK_CLOCK', time: now, cpuChange });
+      dispatch({ type: 'TICK_CLOCK', time: now });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   const selectedService = state.services[state.selectedIndex] || state.services[0];
   const activeFilter = state.filterOptions[state.filterIndex] || 'All Services';
+  const startingCount = state.services.filter(service => service.status === 'starting' || service.status === 'waiting').length;
+  const stoppedCount = state.services.filter(service => service.status === 'stopped' || service.status === 'blocked' || service.status === 'warning').length;
+  const systemStatus = state.services.length === 0
+    ? 'No services configured'
+    : state.summary.servicesRunning === state.summary.servicesTotal
+      ? 'All services running'
+      : `${state.summary.servicesRunning}/${state.summary.servicesTotal} running${startingCount > 0 ? ` · ${startingCount} starting` : stoppedCount > 0 ? ` · ${stoppedCount} stopped` : ''}`;
+
+  if (viewport.isTooSmall) {
+    return <TerminalSizeNotice width={viewport.width} height={viewport.height} />;
+  }
 
   return (
     <ClickProvider clickManagerRef={clickManagerRef}>
@@ -82,7 +89,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
         {/* 1. Header Bar (Row 1, guaranteed 1 line) */}
         <Header 
           time={state.time} 
-          systemStatus="All Systems Running" 
+          systemStatus={systemStatus}
           width={viewport.width}
         />
 
@@ -120,7 +127,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                   onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'services' })}
                 />
                 <SystemPanel 
-                  metrics={state.metrics} 
+                  summary={state.summary}
                   panelWidth={viewport.width}
                   height={viewport.systemPanelHeight}
                   isUltraCompact={viewport.isUltraCompactHeight}
@@ -130,6 +137,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
             {state.narrowTab === 'detail' && (
               <ServiceDetailPanel 
                 service={selectedService} 
+                hasConfiguredProfile={Boolean(config)}
                 activeTab={state.activeTab}
                 isRestarting={state.restartingServiceId === selectedService?.id}
                 maxLogs={Math.max(4, viewport.contentHeight - 6)}
@@ -149,7 +157,6 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 searchQuery={state.searchQuery}
                 isSearching={state.isSearching}
                 activeFilter={activeFilter}
-                isLive={state.isLive}
                 maxLogs={Math.max(4, viewport.contentHeight - 4)}
                 isFocused={true}
                 scrollOffset={state.globalLogScroll}
@@ -157,7 +164,6 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 height={viewport.contentHeight - 1}
                 onToggleSearch={() => dispatch({ type: 'SET_SEARCHING', isSearching: !state.isSearching })}
                 onCycleFilter={() => dispatch({ type: 'CYCLE_FILTER' })}
-                onToggleLive={() => dispatch({ type: 'TOGGLE_LIVE' })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'globalLogs' })}
               />
             )}
@@ -178,7 +184,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'services' })}
               />
               <SystemPanel 
-                metrics={state.metrics} 
+                summary={state.summary}
                 panelWidth={viewport.leftPanelWidth}
                 height={viewport.systemPanelHeight}
                 isUltraCompact={viewport.isUltraCompactHeight}
@@ -189,6 +195,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
             <Box flexDirection="column" width={viewport.rightPanelWidth} height={viewport.contentHeight}>
               <ServiceDetailPanel 
                 service={selectedService} 
+                hasConfiguredProfile={Boolean(config)}
                 activeTab={state.activeTab}
                 isRestarting={state.restartingServiceId === selectedService?.id}
                 maxLogs={viewport.maxServiceLogs}
@@ -207,7 +214,6 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 searchQuery={state.searchQuery}
                 isSearching={state.isSearching}
                 activeFilter={activeFilter}
-                isLive={state.isLive}
                 maxLogs={viewport.maxGlobalLogs}
                 isFocused={state.activePanel === 'globalLogs'}
                 scrollOffset={state.globalLogScroll}
@@ -215,7 +221,6 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 height={viewport.globalLogsPanelHeight}
                 onToggleSearch={() => dispatch({ type: 'SET_SEARCHING', isSearching: !state.isSearching })}
                 onCycleFilter={() => dispatch({ type: 'CYCLE_FILTER' })}
-                onToggleLive={() => dispatch({ type: 'TOGGLE_LIVE' })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'globalLogs' })}
               />
             </Box>
@@ -224,10 +229,11 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
 
         {/* 3. Footer Bar (Bottom Row, guaranteed 1 line) */}
         <Footer 
-          isConnected={true} 
           activePanel={state.activePanel} 
           width={viewport.width} 
           onToggleHelp={() => dispatch({ type: 'TOGGLE_HELP', show: !state.showHelp })}
+          onEditProfile={onEditProfile}
+          onNewProfile={onNewProfile}
           onSwitchConfig={onSwitchConfig}
         />
 

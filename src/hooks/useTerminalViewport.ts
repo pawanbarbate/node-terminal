@@ -2,19 +2,29 @@ import { useState, useEffect } from 'react';
 import { useStdout } from 'ink';
 import { ViewportInfo } from '../types/index.js';
 
+export const MIN_TERMINAL_WIDTH = 60;
+export const MIN_TERMINAL_HEIGHT = 18;
+
+const DEFAULT_TERMINAL_WIDTH = 80;
+const DEFAULT_TERMINAL_HEIGHT = 24;
+
+function validDimension(value: number | undefined, fallback: number): number {
+  return value && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
 export function useTerminalViewport(overrideWidth?: number, overrideHeight?: number): ViewportInfo {
   const { stdout } = useStdout();
   const [dimensions, setDimensions] = useState({
-    width: overrideWidth ?? (stdout?.columns || 80),
-    height: overrideHeight ?? (stdout?.rows || 24)
+    width: validDimension(overrideWidth ?? stdout?.columns, DEFAULT_TERMINAL_WIDTH),
+    height: validDimension(overrideHeight ?? stdout?.rows, DEFAULT_TERMINAL_HEIGHT)
   });
 
   useEffect(() => {
     if (!stdout) return;
     const handleResize = () => {
       setDimensions({
-        width: stdout.columns || 80,
-        height: stdout.rows || 24
+        width: validDimension(overrideWidth ?? stdout.columns, DEFAULT_TERMINAL_WIDTH),
+        height: validDimension(overrideHeight ?? stdout.rows, DEFAULT_TERMINAL_HEIGHT)
       });
     };
 
@@ -22,13 +32,14 @@ export function useTerminalViewport(overrideWidth?: number, overrideHeight?: num
     return () => {
       stdout.off('resize', handleResize);
     };
-  }, [stdout]);
+  }, [stdout, overrideWidth, overrideHeight]);
 
-  const width = overrideWidth ?? dimensions.width;
-  const height = overrideHeight ?? dimensions.height;
+  const width = validDimension(overrideWidth ?? dimensions.width, DEFAULT_TERMINAL_WIDTH);
+  const height = validDimension(overrideHeight ?? dimensions.height, DEFAULT_TERMINAL_HEIGHT);
 
   const isWide = width >= 115;
   const isUltraNarrow = width < 72;
+  const isTooSmall = width < MIN_TERMINAL_WIDTH || height < MIN_TERMINAL_HEIGHT;
   const isUltraCompactHeight = height < 18;
   const isCompactHeight = height <= 25;
 
@@ -73,6 +84,7 @@ export function useTerminalViewport(overrideWidth?: number, overrideHeight?: num
     height,
     isWide,
     isUltraNarrow,
+    isTooSmall,
     isCompactHeight,
     isUltraCompactHeight,
     leftPanelWidth,

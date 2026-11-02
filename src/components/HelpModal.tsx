@@ -47,7 +47,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({ onClose, width 
         </Box>
         <Box justifyContent="space-between">
           <Text color="#A78BFA" bold>1  2  3  /  ← →</Text>
-          <Text color={theme.colors.textSecondary}>Switch tabs (Logs, Errors, Metrics)</Text>
+          <Text color={theme.colors.textSecondary}>Switch tabs (Logs, Errors, Process)</Text>
         </Box>
         <Box justifyContent="space-between">
           <Text color={theme.colors.accent} bold>/</Text>
@@ -58,8 +58,8 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({ onClose, width 
           <Text color={theme.colors.textSecondary}>Cycle service filter dropdown</Text>
         </Box>
         <Box justifyContent="space-between">
-          <Text color={theme.colors.running} bold>l  or  Space</Text>
-          <Text color={theme.colors.textSecondary}>Toggle Live streaming logs</Text>
+          <Text color={theme.colors.accent} bold>e / n</Text>
+          <Text color={theme.colors.textSecondary}>Edit current profile / create a new profile</Text>
         </Box>
         <Box justifyContent="space-between">
           <Text color={theme.colors.textPrimary} bold>t  or  Tab</Text>

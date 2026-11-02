@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import path from 'path';
 import { Box, Text, useInput } from 'ink';
-import { DevPulseConfig, ServiceConfig } from '../../types/config.js';
-import { autoDetectServices, saveConfigFile } from '../../services/configManager.js';
+import { CONFIG_SCHEMA_URL, DevPulseConfig, ServiceConfig } from '../../types/config.js';
+import { autoDetectServices, saveConfigFile, validateConfig, validateDirectory } from '../../services/configManager.js';
 import { useTerminalViewport } from '../../hooks/useTerminalViewport.js';
 import Header from '../Header.js';
+import TerminalSizeNotice from '../TerminalSizeNotice.js';
 import WizardRegistryPanel, { ArchitecturePreset } from './WizardRegistryPanel.js';
 import WizardFormPanel, { WizardFormField } from './WizardFormPanel.js';
 import WizardFooter from './WizardFooter.js';
@@ -13,11 +14,12 @@ import { theme } from '../../theme/theme.js';
 import { logger } from '../../logger/logger.js';
 
 export interface SetupWizardProps {
-  onComplete: (config: DevPulseConfig) => void;
+  onComplete: (config: DevPulseConfig, savedPath: string) => void;
   onCancel?: () => void;
   width?: number;
   height?: number;
   configFilePath?: string;
+  initialConfig?: DevPulseConfig;
 }
 
 export const ARCHITECTURE_PRESETS: ArchitecturePreset[] = [
@@ -62,24 +64,21 @@ const FORM_FIELDS: WizardFormField[] = [
   'saveBtn'
 ];
 
+const commandText = (value?: string | string[]) =>
+  Array.isArray(value) ? value.join(' && ') : value || '';
+
 export const SetupWizard: React.FC<SetupWizardProps> = ({
   onComplete,
   onCancel,
   width: propWidth,
   height: propHeight,
-  configFilePath
+  configFilePath,
+  initialConfig
 }) => {
   const viewport = useTerminalViewport(propWidth, propHeight);
   const clickManagerRef = useRef<ClickManagerContextValue | null>(null);
   const workspaceName = path.basename(process.cwd()) || 'Workspace';
   const activeConfigFilename = configFilePath ? path.basename(configFilePath) : 'config.devpulse.json';
-
-  // Assert clean SGR mouse reporting mode on mount
-  useEffect(() => {
-    try {
-      process.stdout.write('\x1b[?1000h\x1b[?1006h');
-    } catch {}
-  }, []);
 
   // Live clock timer for top Header
   const [time, setTime] = useState(() => new Date().toTimeString().split(' ')[0] || '12:00:00');
@@ -95,6 +94,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
   // Services registry list state
   const [services, setServices] = useState<ServiceConfig[]>(() => {
+    if (initialConfig) {
+      return initialConfig.services.map(service => ({ ...service }));
+    }
     if (detected.length > 0) {
       return detected.map(d => ({
         name: d.name || 'app',
@@ -108,25 +110,26 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   });
 
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [isEditingNew, setIsEditingNew] = useState(() => detected.length === 0);
-  const [activePanel, setActivePanel] = useState<'services' | 'form'>(() => detected.length === 0 ? 'form' : 'services');
-  const [narrowTab, setNarrowTab] = useState<'services' | 'form'>(() => detected.length === 0 ? 'form' : 'services');
+  const [isEditingNew, setIsEditingNew] = useState(() => services.length === 0);
+  const [activePanel, setActivePanel] = useState<'services' | 'form'>(() => services.length === 0 ? 'form' : 'services');
+  const [narrowTab, setNarrowTab] = useState<'services' | 'form'>(() => services.length === 0 ? 'form' : 'services');
 
   // Active form field values
-  const [name, setName] = useState(() => (detected.length > 0 ? services[0]?.name || '' : ''));
-  const [pathValue, setPathValue] = useState(() => (detected.length > 0 ? services[0]?.path || '' : ''));
+  const [name, setName] = useState(() => services[0]?.name || '');
+  const [pathValue, setPathValue] = useState(() => services[0]?.path || '');
   const [command, setCommand] = useState<string>(() => {
-    const firstCmd = detected.length > 0 ? services[0]?.command : undefined;
-    return Array.isArray(firstCmd) ? firstCmd.join(' && ') : (firstCmd || 'npm run dev');
+    const firstService = services[0];
+    if (!firstService) return 'npm run dev';
+    return commandText(firstService.command || firstService.commands);
   });
-  const [port, setPort] = useState(() => (detected.length > 0 && services[0]?.port ? String(services[0].port) : ''));
-  const [autoStart, setAutoStart] = useState<boolean>(() => (detected.length > 0 ? services[0]?.autoStart ?? true : true));
+  const [port, setPort] = useState(() => (services[0]?.port ? String(services[0].port) : ''));
+  const [autoStart, setAutoStart] = useState<boolean>(() => (services[0]?.autoStart ?? true));
   const [dependsOnStr, setDependsOnStr] = useState<string>(() => {
-    const firstSvc = detected.length > 0 ? services[0] : undefined;
+    const firstSvc = services[0];
     return Array.isArray(firstSvc?.dependsOn) ? firstSvc.dependsOn.join(', ') : '';
   });
   const [preStartStr, setPreStartStr] = useState<string>(() => {
-    const firstSvc = detected.length > 0 ? services[0] : undefined;
+    const firstSvc = services[0];
     return Array.isArray(firstSvc?.preStart) ? firstSvc.preStart.join(' && ') : '';
   });
   const [focusedField, setFocusedField] = useState<WizardFormField>('name');
@@ -136,7 +139,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   const loadServiceToForm = useCallback((svc: ServiceConfig) => {
     setName(svc.name);
     setPathValue(svc.path);
-    setCommand(Array.isArray(svc.command) ? svc.command.join(' && ') : (svc.command || ''));
+    setCommand(commandText(svc.command || svc.commands));
     setPort(svc.port ? String(svc.port) : '');
     setAutoStart(svc.autoStart !== false);
     setDependsOnStr(Array.isArray(svc.dependsOn) ? svc.dependsOn.join(', ') : '');
@@ -208,15 +211,21 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       setActivePanel('form');
       return;
     }
-    if (!command.trim()) {
-      setError('Start command is required');
+    if (!validateDirectory(pathValue.trim())) {
+      setError('Folder path must be an existing directory');
+      setFocusedField('path');
+      setActivePanel('form');
+      return;
+    }
+    if (!command.trim() && !preStartStr.trim()) {
+      setError('A start command or pre-start command is required');
       setFocusedField('command');
       setActivePanel('form');
       return;
     }
 
-    const parsedPort = port.trim() ? parseInt(port.trim(), 10) : undefined;
-    if (port.trim() && (isNaN(parsedPort!) || parsedPort! <= 0 || parsedPort! > 65535)) {
+    const parsedPort = port.trim() ? Number(port.trim()) : undefined;
+    if (port.trim() && (!/^\d+$/.test(port.trim()) || !Number.isInteger(parsedPort) || parsedPort! <= 0 || parsedPort! > 65535)) {
       setError('Port must be a valid number between 1 and 65535');
       setFocusedField('port');
       setActivePanel('form');
@@ -233,10 +242,17 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           : [preStartStr.trim()])
       : undefined;
 
+    const originalService = isEditingNew ? undefined : services[selectedIndex];
+    const originalCommand = originalService
+      ? commandText(originalService.command || originalService.commands)
+      : undefined;
+    const isCommandUnchanged = originalService !== undefined && command.trim() === originalCommand;
     const savedService: ServiceConfig = {
+      ...originalService,
       name: name.trim(),
       path: pathValue.trim(),
-      command: command.trim(),
+      command: isCommandUnchanged ? originalService.command || '' : command.trim(),
+      commands: isCommandUnchanged ? originalService.commands : undefined,
       port: parsedPort,
       autoStart,
       dependsOn: parsedDeps,
@@ -264,15 +280,38 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     }
 
     const config: DevPulseConfig = {
-      $schema: 'https://devpulse.dev/schema.json',
-      name: process.cwd().split('/').pop() || 'Workspace',
-      version: '1.0.0',
+      ...initialConfig,
+      $schema: CONFIG_SCHEMA_URL,
+      name: initialConfig?.name || process.cwd().split('/').pop() || 'Workspace',
+      version: initialConfig?.version || '1.0.0',
       services
     };
 
-    saveConfigFile(config, process.cwd(), configFilePath);
-    onComplete(config);
-  }, [services, onComplete, configFilePath]);
+    const validationErrors = validateConfig(config);
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('; '));
+      setActivePanel('form');
+      return;
+    }
+    const invalidDirectory = services.find(service => !validateDirectory(service.path, process.cwd()));
+    if (invalidDirectory) {
+      setError(`Service "${invalidDirectory.name}" folder does not exist: ${invalidDirectory.path}`);
+      setActivePanel('form');
+      return;
+    }
+
+    let savedPath: string;
+    try {
+      savedPath = saveConfigFile(config, process.cwd(), configFilePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`Unable to save profile: ${message}`);
+      setError(`Unable to save profile: ${message}`);
+      setActivePanel('form');
+      return;
+    }
+    onComplete(config, savedPath);
+  }, [services, onComplete, configFilePath, initialConfig]);
 
   // Apply auto-detected suggestion
   const handleApplySuggestion = useCallback((sug: Partial<ServiceConfig>) => {
@@ -485,6 +524,10 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       }
     }
   });
+
+  if (viewport.isTooSmall) {
+    return <TerminalSizeNotice width={viewport.width} height={viewport.height} />;
+  }
 
   return (
     <ClickProvider clickManagerRef={clickManagerRef}>

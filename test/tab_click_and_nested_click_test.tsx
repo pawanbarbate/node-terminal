@@ -38,8 +38,8 @@ async function testNestedClickablePrecedence() {
         <Clickable onClick={() => { clickedTab = 'errors'; }} width={10} height={2}>
           {/* Errors Tab */}
         </Clickable>
-        <Clickable onClick={() => { clickedTab = 'metrics'; }} width={9} height={2}>
-          {/* Metrics Tab */}
+        <Clickable onClick={() => { clickedTab = 'process'; }} width={9} height={2}>
+          {/* Process Tab */}
         </Clickable>
       </Clickable>
     </ClickProvider>,
@@ -66,11 +66,11 @@ async function testNestedClickablePrecedence() {
   assert.strictEqual(hitErrors, true, 'Click on Errors tab must be dispatched');
   assert.strictEqual(clickedTab, 'errors', 'Errors tab onClick must be invoked');
 
-  // Test click on Tab 3 (Metrics)
+  // Test click on Tab 3 (Process)
   clickedTab = '';
-  const hitMetrics = clickManagerRef.current.dispatchClick(18, 1);
-  assert.strictEqual(hitMetrics, true, 'Click on Metrics tab must be dispatched');
-  assert.strictEqual(clickedTab, 'metrics', 'Metrics tab onClick must be invoked');
+  const hitProcess = clickManagerRef.current.dispatchClick(18, 1);
+  assert.strictEqual(hitProcess, true, 'Click on Process tab must be dispatched');
+  assert.strictEqual(clickedTab, 'process', 'Process tab onClick must be invoked');
 
   // Test click on parent blank space (col 50, row 10 - inside parent, outside all tabs)
   clickedTab = '';
@@ -84,13 +84,13 @@ async function testNestedClickablePrecedence() {
 
   console.log('✔ Tab 1 (Logs) received click over parent panel');
   console.log('✔ Tab 2 (Errors) received click over parent panel');
-  console.log('✔ Tab 3 (Metrics) received click over parent panel');
+  console.log('✔ Tab 3 (Process) received click over parent panel');
   console.log('✔ Parent panel receives click when clicking blank space');
 }
 
 // TEST 2: Reducer tab state transition
 function testReducerTabTransitions() {
-  const tabs = ['logs', 'errors', 'metrics'] as const;
+  const tabs = ['logs', 'errors', 'process'] as const;
 
   for (const tab of tabs) {
     const nextState = dashboardReducer(initialDashboardState, {

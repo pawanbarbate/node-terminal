@@ -41,8 +41,7 @@ async function runUptimePrecisionTests() {
   console.log('[Test 2] Verifying TICK_CLOCK delta calculation...');
   state = dashboardReducer(state, {
     type: 'TICK_CLOCK',
-    time: '12:00:03',
-    cpuChange: 1
+    time: '12:00:03'
   });
 
   const updatedApi = state.services.find(s => s.name === 'api')!;
@@ -55,8 +54,7 @@ async function runUptimePrecisionTests() {
   console.log('[Test 3] Verifying immunity to rapid duplicate TICK_CLOCK dispatches...');
   state = dashboardReducer(state, {
     type: 'TICK_CLOCK',
-    time: '12:00:03',
-    cpuChange: 0
+    time: '12:00:03'
   });
   const afterDuplicateApi = state.services.find(s => s.name === 'api')!;
   assert.strictEqual(afterDuplicateApi.uptimeSeconds, 3, 'Multiple dispatches within same second must NOT jump to 4s or 5s');
@@ -70,8 +68,7 @@ async function runUptimePrecisionTests() {
   };
   state = dashboardReducer(state, {
     type: 'TICK_CLOCK',
-    time: '12:02:05',
-    cpuChange: 0
+    time: '12:02:05'
   });
   const formattedApi = state.services.find(s => s.name === 'api')!;
   assert.strictEqual(formattedApi.uptimeSeconds, 125);
@@ -85,4 +82,3 @@ runUptimePrecisionTests().catch(err => {
   console.error('Test failed:', err);
   process.exit(1);
 });
-

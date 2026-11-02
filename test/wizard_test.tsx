@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToString } from 'ink';
 import SetupWizard from '../src/components/wizard/SetupWizard.js';
+import { DevPulseConfig } from '../src/types/config.js';
 
 console.log('--- TEST 1: Render 80x24 SetupWizard ---');
 const output80x24 = renderToString(
@@ -26,6 +27,24 @@ const output120x36 = renderToString(
 const lines120x36 = output120x36.split('\n');
 console.log(`Total lines rendered: ${lines120x36.length}`);
 
+const existingProfile: DevPulseConfig = {
+  name: 'Existing Profile',
+  version: '2.0.0',
+  settings: { bootStaggerMs: 1200 },
+  services: [
+    { name: 'existing-api', path: './existing-api', command: 'npm run api', autoStart: true }
+  ]
+};
+const editOutput = renderToString(
+  <SetupWizard
+    width={120}
+    height={36}
+    configFilePath='/tmp/existing.devpulse.json'
+    initialConfig={existingProfile}
+    onComplete={() => {}}
+  />
+);
+
 // Verify presence of signature elements
 const hasBranding = output80x24.includes('DevPulse');
 const hasRegistry = output80x24.includes('REGISTRY');
@@ -40,6 +59,9 @@ const hasCoreFields = ['Name:', 'Folder:', 'Command:', 'Port:', 'Boot:', 'Depend
 const hasSectionOrder = output80x24.indexOf('IDENTITY') < output80x24.indexOf('Name:') &&
   output80x24.indexOf('STARTUP') < output80x24.indexOf('Command:') &&
   output80x24.indexOf('ORCHESTRATION') < output80x24.indexOf('Depends:');
+const existingProfilePrefilled = editOutput.includes('existing-api') &&
+  editOutput.includes('./existing-api') &&
+  editOutput.includes('existing.devpulse.json');
 
 console.log('\n--- VERIFICATION CHECKS ---');
 console.log('Header branding present:', hasBranding);
@@ -52,9 +74,11 @@ console.log('Footer present:', hasFooter);
 console.log('Sectioned form present:', hasFormSections);
 console.log('All existing form fields present:', hasCoreFields);
 console.log('Fields grouped under the correct sections:', hasSectionOrder);
+console.log('Existing profile services and destination are prefilled:', existingProfilePrefilled);
 
 if (hasBranding && hasRegistry && hasForm && hasAddBtn && hasRemoveBtn && hasSaveCTA && hasFooter &&
-  hasFormSections && hasCoreFields && hasSectionOrder && lines80x24.length === 24 && lines120x36.length === 36) {
+  hasFormSections && hasCoreFields && hasSectionOrder && existingProfilePrefilled &&
+  lines80x24.length === 24 && lines120x36.length === 36) {
   console.log('\n✅ ALL VISUAL SYNERGY AND RESPONSIVE LAYOUT CHECKS PASSED!');
 } else {
   console.error('\n❌ SOME CHECKS FAILED!');

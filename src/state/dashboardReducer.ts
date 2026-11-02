@@ -4,25 +4,15 @@ import {
   NarrowTab,
   Service,
   ServiceStatus,
-  SystemMetrics,
+  WorkspaceSummary,
   LogEntry,
   DevPulseConfig
 } from '../types/index.js';
-import {
-  INITIAL_SERVICES,
-  INITIAL_GLOBAL_LOGS,
-  INITIAL_SYSTEM_METRICS
-} from '../data/mockData.js';
 
-export const FILTER_OPTIONS = [
-  'All Services',
-  'AUTH',
-  'USER',
-  'PAYMENT',
-  'NOTIF',
-  'GATEWAY',
-  'WORKER'
-];
+const MAX_LOG_ENTRIES = 200;
+const MAX_ERROR_ENTRIES = 100;
+
+export const FILTER_OPTIONS = ['All Services'];
 
 export interface DashboardState {
   selectedIndex: number;
@@ -32,13 +22,12 @@ export interface DashboardState {
   time: string;
   uptimeSeconds: number;
   startedAt?: number;
-  metrics: SystemMetrics;
+  summary: WorkspaceSummary;
   services: Service[];
   restartingServiceId: string | null;
   globalLogs: LogEntry[];
   serviceLogScroll: number;
   globalLogScroll: number;
-  isLive: boolean;
   searchQuery: string;
   isSearching: boolean;
   filterIndex: number;
@@ -51,15 +40,14 @@ export const initialDashboardState: DashboardState = {
   activeTab: 'logs',
   activePanel: 'services',
   narrowTab: 'services',
-  time: '10:24:17',
-  uptimeSeconds: 754,
-  metrics: INITIAL_SYSTEM_METRICS,
-  services: INITIAL_SERVICES,
+  time: new Date().toTimeString().slice(0, 8),
+  uptimeSeconds: 0,
+  summary: { servicesRunning: 0, servicesTotal: 0, uptime: '0m 0s' },
+  services: [],
   restartingServiceId: null,
-  globalLogs: INITIAL_GLOBAL_LOGS,
+  globalLogs: [],
   serviceLogScroll: 0,
   globalLogScroll: 0,
-  isLive: true,
   searchQuery: '',
   isSearching: false,
   filterIndex: 0,
@@ -68,9 +56,7 @@ export const initialDashboardState: DashboardState = {
 };
 
 export function configToServices(config?: DevPulseConfig): Service[] {
-  if (!config || !config.services || config.services.length === 0) {
-    return INITIAL_SERVICES;
-  }
+  if (!config?.services) return [];
 
   return config.services.map((s, idx) => ({
     id: `svc-${idx + 1}-${s.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
@@ -83,17 +69,10 @@ export function configToServices(config?: DevPulseConfig): Service[] {
       ? s.command.join(' && ')
       : (s.command || (Array.isArray(s.commands) ? s.commands.join(' && ') : '')),
     path: s.path,
-    port: s.port ? `:${s.port}` : ':3000',
+    port: s.port ? `:${s.port}` : '',
     pid: '-',
     errors: 0,
     rawConfig: s,
-    metrics: {
-      cpu: '0%',
-      memory: '0 MB',
-      p50: '0 ms',
-      p99: '0 ms',
-      requests: '0 req/min'
-    },
     logs: [],
     errorLogs: []
   }));
@@ -103,18 +82,18 @@ export function createInitialDashboardState(config?: DevPulseConfig): DashboardS
   const services = configToServices(config);
   const filterOptions = config?.services && config.services.length > 0
     ? ['All Services', ...config.services.map(s => s.name)]
-    : FILTER_OPTIONS;
+    : FILTER_OPTIONS.slice(0, 1);
 
   return {
     ...initialDashboardState,
     startedAt: Date.now(),
     services,
-    globalLogs: config?.services && config.services.length > 0 ? [] : INITIAL_GLOBAL_LOGS,
+    globalLogs: [],
     filterOptions,
-    metrics: {
-      ...INITIAL_SYSTEM_METRICS,
+    summary: {
       servicesTotal: services.length,
-      servicesRunning: 0
+      servicesRunning: 0,
+      uptime: '0m 0s'
     }
   };
 }
@@ -137,15 +116,10 @@ export type DashboardAction =
   | { type: 'SET_SEARCHING'; isSearching: boolean }
   | { type: 'CYCLE_FILTER' }
   | { type: 'SET_FILTER_INDEX'; index: number }
-  | { type: 'TOGGLE_LIVE' }
   | { type: 'START_RESTART_SERVICE'; index: number }
-  | { type: 'FINISH_RESTART_SERVICE'; index: number }
-  | { type: 'TOGGLE_STOP_SERVICE'; index: number }
-  | { type: 'TICK_CLOCK'; time: string; cpuChange: number }
-  | { type: 'APPEND_GLOBAL_LOG'; log: LogEntry; timeStr: string }
+  | { type: 'TICK_CLOCK'; time: string }
   | { type: 'APPEND_REAL_LOG'; serviceName: string; log: LogEntry }
-  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string }
-  | { type: 'UPDATE_SERVICE_METRICS'; metrics: Record<string, { cpu?: string; memory?: string }> };
+  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string };
 
 export function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
   switch (action.type) {
@@ -302,12 +276,6 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         filterIndex: action.index
       };
 
-    case 'TOGGLE_LIVE':
-      return {
-        ...state,
-        isLive: !state.isLive
-      };
-
     case 'START_RESTART_SERVICE': {
       const target = state.services[action.index];
       if (!target) return state;
@@ -320,29 +288,6 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
       };
     }
 
-    case 'FINISH_RESTART_SERVICE':
-      return {
-        ...state,
-        restartingServiceId: null,
-        services: state.services.map((s, i) =>
-          i === action.index ? { ...s, status: 'running', statusText: 'RUNNING' } : s
-        )
-      };
-
-    case 'TOGGLE_STOP_SERVICE':
-      return {
-        ...state,
-        services: state.services.map((s, i) =>
-          i === action.index
-            ? {
-                ...s,
-                status: s.status === 'running' ? 'stopped' : 'starting',
-                statusText: s.status === 'running' ? 'STOPPED' : 'STARTING'
-              }
-            : s
-        )
-      };
-
     case 'TICK_CLOCK': {
       const now = Date.now();
       const nextUptime = state.startedAt
@@ -350,8 +295,6 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         : state.uptimeSeconds + 1;
       const mins = Math.floor(nextUptime / 60);
       const secs = nextUptime % 60;
-      const newCpu = Math.min(48, Math.max(12, state.metrics.cpu + action.cpuChange));
-
       const updatedServices = state.services.map(s => {
         if (s.status === 'running') {
           const u = s.startedAt
@@ -373,23 +316,22 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         time: action.time,
         uptimeSeconds: nextUptime,
         services: updatedServices,
-        metrics: {
-          ...state.metrics,
-          uptime: `${mins}m ${secs}s`,
-          cpu: newCpu
+        summary: {
+          ...state.summary,
+          uptime: `${mins}m ${secs}s`
         }
       };
     }
 
     case 'APPEND_REAL_LOG': {
-      const nextGlobal = [...state.globalLogs.slice(-200), action.log];
+      const nextGlobal = [...state.globalLogs.slice(-(MAX_LOG_ENTRIES - 1)), action.log];
       const isError = action.log.level === 'error' || action.log.level === 'ERROR';
 
       const nextServices = state.services.map(s => {
         if (s.name.toLowerCase() === action.serviceName.toLowerCase()) {
-          const nextLogs = [...(s.logs || []).slice(-200), action.log];
+          const nextLogs = [...(s.logs || []).slice(-(MAX_LOG_ENTRIES - 1)), action.log];
           const nextErrors = isError
-            ? [...(s.errorLogs || []).slice(-100), action.log]
+            ? [...(s.errorLogs || []).slice(-(MAX_ERROR_ENTRIES - 1)), action.log]
             : (s.errorLogs || []);
           return {
             ...s,
@@ -437,57 +379,11 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         ...state,
         restartingServiceId: action.status === 'running' ? null : state.restartingServiceId,
         services: nextServices,
-        metrics: {
-          ...state.metrics,
-          servicesRunning: runningCount
+        summary: {
+          ...state.summary,
+          servicesRunning: runningCount,
+          servicesTotal: nextServices.length
         }
-      };
-    }
-
-    case 'UPDATE_SERVICE_METRICS': {
-      const nextServices = state.services.map(s => {
-        const m = action.metrics[s.name];
-        if (m) {
-          return {
-            ...s,
-            metrics: {
-              ...s.metrics,
-              cpu: m.cpu || s.metrics?.cpu,
-              memory: m.memory || s.metrics?.memory
-            }
-          };
-        }
-        return s;
-      });
-
-      return {
-        ...state,
-        services: nextServices
-      };
-    }
-
-    case 'APPEND_GLOBAL_LOG': {
-      const nextGlobal = [...state.globalLogs.slice(-30), action.log];
-      const nextServices = state.services.map(s => {
-        if (s.name.toUpperCase().includes(action.log.service.toUpperCase())) {
-          return {
-            ...s,
-            logs: [...(s.logs || []).slice(-25), {
-              id: `${action.log.id}-s`,
-              timestamp: action.timeStr,
-              service: action.log.service,
-              level: action.log.level,
-              message: action.log.message
-            }]
-          };
-        }
-        return s;
-      });
-
-      return {
-        ...state,
-        globalLogs: nextGlobal,
-        services: nextServices
       };
     }
 
@@ -495,4 +391,3 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
       return state;
   }
 }
-

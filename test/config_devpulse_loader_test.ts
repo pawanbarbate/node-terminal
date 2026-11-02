@@ -1,28 +1,25 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import {
   getConfigFilePath,
   hasConfigFile,
   loadConfigFile,
   saveConfigFile,
   parseCliArgs,
-  CONFIG_FILENAMES
+  CONFIG_FILENAMES,
+  validateConfig
 } from '../src/services/configManager.js';
 import { DevPulseConfig } from '../src/types/config.js';
 
 console.log('--- STARTING CONFIG.DEVPULSE.JSON & DYNAMIC LOADER TESTS ---');
 
-const tmpTestDir = path.resolve(process.cwd(), 'test/fixtures/config-loader-sandbox');
-if (!fs.existsSync(tmpTestDir)) {
-  fs.mkdirSync(tmpTestDir, { recursive: true });
-}
+const tmpTestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'devpulse-config-loader-'));
 
 function cleanupSandbox() {
   if (fs.existsSync(tmpTestDir)) {
-    const files = fs.readdirSync(tmpTestDir);
-    for (const file of files) {
-      fs.unlinkSync(path.join(tmpTestDir, file));
-    }
+    fs.rmSync(tmpTestDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpTestDir, { recursive: true });
   }
 }
 
@@ -161,39 +158,86 @@ try {
   console.log('✔ All CLI argument variations (-c, --config, --config=..., positional) parse correctly');
 
   // -------------------------------------------------------------
-  // Test 7: saveConfigFile preserves detected file path
+  // Test 7: New profile creation must not overwrite an existing profile
   // -------------------------------------------------------------
-  console.log('[TEST 7] Verifying saveConfigFile preserves the existing config file...');
+  console.log('[TEST 7] Verifying new profiles do not overwrite existing profiles...');
   cleanupSandbox();
 
   const activeTestFile = path.join(tmpTestDir, 'staging.devpulse.json');
-  fs.writeFileSync(activeTestFile, JSON.stringify(sampleConfig, null, 2), 'utf-8');
+  const originalContents = JSON.stringify(sampleConfig, null, 2);
+  fs.writeFileSync(activeTestFile, originalContents, 'utf-8');
 
-  // Update a service in config
   const updatedConfig: DevPulseConfig = {
     ...sampleConfig,
+    name: 'new-profile',
     services: [
       ...sampleConfig.services,
       { name: 'worker', path: './worker', command: 'npm run worker', autoStart: true }
     ]
   };
 
-  const savedTarget = saveConfigFile(updatedConfig, tmpTestDir);
+  const createdPath = saveConfigFile(updatedConfig, tmpTestDir);
+  if (createdPath === activeTestFile || fs.readFileSync(activeTestFile, 'utf-8') !== originalContents) {
+    throw new Error('Creating a new profile overwrote an existing profile');
+  }
+  if (!fs.existsSync(createdPath)) throw new Error('New profile file was not created');
+  const secondCreatedPath = saveConfigFile(updatedConfig, tmpTestDir);
+  if (secondCreatedPath === createdPath || fs.readFileSync(activeTestFile, 'utf-8') !== originalContents) {
+    throw new Error('Creating a profile with a colliding name did not choose another file');
+  }
+  const thirdCreatedPath = saveConfigFile(updatedConfig, tmpTestDir);
+  if (thirdCreatedPath === createdPath || thirdCreatedPath === secondCreatedPath) {
+    throw new Error('Repeated profile creation reused an existing target');
+  }
+
+  // Explicitly editing a selected profile updates only that file and retains a backup.
+  const editedConfig = { ...updatedConfig, name: 'staging-environment' };
+  const savedTarget = saveConfigFile(editedConfig, tmpTestDir, activeTestFile);
   if (savedTarget !== activeTestFile) {
-    throw new Error(`Expected saveConfigFile to write to ${activeTestFile}, got: ${savedTarget}`);
+    throw new Error(`Expected explicit edit to write ${activeTestFile}, got: ${savedTarget}`);
+  }
+  const backupPath = `${activeTestFile}.bak`;
+  if (fs.readFileSync(backupPath, 'utf-8') !== originalContents) {
+    throw new Error('Editing a profile did not preserve its previous contents in the backup');
   }
 
   const reloaded = JSON.parse(fs.readFileSync(activeTestFile, 'utf-8')) as DevPulseConfig;
-  if (reloaded.services.length !== 3) {
-    throw new Error(`Expected 3 services in saved config, got ${reloaded.services.length}`);
+  if (reloaded.services.length !== 3 || reloaded.name !== 'staging-environment') {
+    throw new Error('Explicitly edited profile did not contain the expected config');
   }
-  console.log('✔ saveConfigFile preserves and writes back to staging.devpulse.json');
+  console.log('✔ New profiles are separate; explicit edits preserve a backup');
+
+  // -------------------------------------------------------------
+  // Test 8: Runtime config validation
+  // -------------------------------------------------------------
+  console.log('[TEST 8] Verifying runtime config validation...');
+  if (validateConfig(sampleConfig).length > 0) {
+    throw new Error('A valid config was rejected');
+  }
+  const duplicateNames = validateConfig({
+    services: [
+      { name: 'api', path: '.', command: 'npm start' },
+      { name: 'API', path: '.', command: 'npm run dev' }
+    ]
+  });
+  if (!duplicateNames.some(error => error.includes('duplicates'))) {
+    throw new Error('Duplicate service names were not rejected');
+  }
+  const invalidPort = validateConfig({
+    services: [{ name: 'api', path: '.', command: 'npm start', port: 70000 }]
+  });
+  if (!invalidPort.some(error => error.includes('port must be an integer'))) {
+    throw new Error('Out-of-range service ports were not rejected');
+  }
+  const missingDependency = validateConfig({
+    services: [{ name: 'api', path: '.', command: 'npm start', dependsOn: ['database'] }]
+  });
+  if (!missingDependency.some(error => error.includes('depends on missing services'))) {
+    throw new Error('Missing service dependencies were not rejected');
+  }
+  console.log('✔ Valid configs load; duplicate names, invalid ports and missing dependencies are rejected');
 
   console.log('\n✅ ALL CONFIG.DEVPULSE.JSON & DYNAMIC LOADER TESTS PASSED PERFECTLY!\n');
 } finally {
-  cleanupSandbox();
-  if (fs.existsSync(tmpTestDir)) {
-    fs.rmdirSync(tmpTestDir);
-  }
+  fs.rmSync(tmpTestDir, { recursive: true, force: true });
 }
-
