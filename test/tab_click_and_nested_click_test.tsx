@@ -41,9 +41,6 @@ async function testNestedClickablePrecedence() {
         <Clickable onClick={() => { clickedTab = 'metrics'; }} width={9} height={2}>
           {/* Metrics Tab */}
         </Clickable>
-        <Clickable onClick={() => { clickedTab = 'env'; }} width={5} height={2}>
-          {/* Env Tab */}
-        </Clickable>
       </Clickable>
     </ClickProvider>,
     { stdin, stdout }
@@ -75,12 +72,6 @@ async function testNestedClickablePrecedence() {
   assert.strictEqual(hitMetrics, true, 'Click on Metrics tab must be dispatched');
   assert.strictEqual(clickedTab, 'metrics', 'Metrics tab onClick must be invoked');
 
-  // Test click on Tab 4 (Env)
-  clickedTab = '';
-  const hitEnv = clickManagerRef.current.dispatchClick(28, 1);
-  assert.strictEqual(hitEnv, true, 'Click on Env tab must be dispatched');
-  assert.strictEqual(clickedTab, 'env', 'Env tab onClick must be invoked');
-
   // Test click on parent blank space (col 50, row 10 - inside parent, outside all tabs)
   clickedTab = '';
   parentClickCount = 0;
@@ -94,13 +85,12 @@ async function testNestedClickablePrecedence() {
   console.log('✔ Tab 1 (Logs) received click over parent panel');
   console.log('✔ Tab 2 (Errors) received click over parent panel');
   console.log('✔ Tab 3 (Metrics) received click over parent panel');
-  console.log('✔ Tab 4 (Env) received click over parent panel');
   console.log('✔ Parent panel receives click when clicking blank space');
 }
 
 // TEST 2: Reducer tab state transition
 function testReducerTabTransitions() {
-  const tabs = ['logs', 'errors', 'metrics', 'env'] as const;
+  const tabs = ['logs', 'errors', 'metrics'] as const;
 
   for (const tab of tabs) {
     const nextState = dashboardReducer(initialDashboardState, {

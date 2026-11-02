@@ -4,7 +4,7 @@ export type ServiceStatus = 'running' | 'stopped' | 'starting' | 'warning' | 'wa
 
 export type ActivePanel = 'services' | 'serviceLogs' | 'globalLogs';
 
-export type ActiveTab = 'logs' | 'errors' | 'metrics' | 'env';
+export type ActiveTab = 'logs' | 'errors' | 'metrics';
 
 export type NarrowTab = 'services' | 'detail' | 'logs';
 
@@ -35,11 +35,6 @@ export interface ServiceMetrics {
   requests?: string;
 }
 
-export interface EnvVar {
-  key: string;
-  value: string;
-}
-
 export interface Service {
   id: string;
   name: string;
@@ -54,7 +49,6 @@ export interface Service {
   pid: string;
   errors: number;
   metrics?: ServiceMetrics;
-  env?: EnvVar[];
   logs?: LogEntry[];
   errorLogs?: LogEntry[];
   rawConfig?: ServiceConfig;

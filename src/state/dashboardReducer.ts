@@ -94,7 +94,6 @@ export function configToServices(config?: DevPulseConfig): Service[] {
       p99: '0 ms',
       requests: '0 req/min'
     },
-    env: [],
     logs: [],
     errorLogs: []
   }));

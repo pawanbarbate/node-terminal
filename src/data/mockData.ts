@@ -19,14 +19,6 @@ export const INITIAL_SERVICES: Service[] = [
       p99: '45 ms',
       requests: '142 req/min'
     },
-    env: [
-      { key: 'PORT', value: '3001' },
-      { key: 'NODE_ENV', value: 'development' },
-      { key: 'DB_HOST', value: 'localhost:5432' },
-      { key: 'REDIS_HOST', value: 'localhost:6379' },
-      { key: 'JWT_SECRET', value: '••••••••••••••••' },
-      { key: 'LOG_LEVEL', value: 'debug' }
-    ],
     logs: [
       { id: 'a-1', timestamp: '10:24:01', level: 'INFO', service: 'AUTH', message: 'Starting auth service...' },
       { id: 'a-2', timestamp: '10:24:02', level: 'INFO', service: 'AUTH', message: 'Loading environment variables' },
@@ -61,12 +53,6 @@ export const INITIAL_SERVICES: Service[] = [
       p99: '60 ms',
       requests: '98 req/min'
     },
-    env: [
-      { key: 'PORT', value: '3002' },
-      { key: 'NODE_ENV', value: 'development' },
-      { key: 'USER_DB_NAME', value: 'users_dev' },
-      { key: 'CACHE_TTL', value: '3600' }
-    ],
     logs: [
       { id: 'u-1', timestamp: '10:24:00', level: 'INFO', service: 'USER', message: 'Starting user service on port 3002...' },
       { id: 'u-2', timestamp: '10:24:02', level: 'INFO', service: 'USER', message: 'Database connection established' },
@@ -95,11 +81,6 @@ export const INITIAL_SERVICES: Service[] = [
       p99: '0 ms',
       requests: '0 req/min'
     },
-    env: [
-      { key: 'PORT', value: '3003' },
-      { key: 'STRIPE_KEY', value: 'sk_test_••••••••' },
-      { key: 'WEBHOOK_SECRET', value: 'whsec_••••••••' }
-    ],
     logs: [
       { id: 'p-1', timestamp: '10:24:01', level: 'INFO', service: 'PAYMENT', message: 'Starting payment service...' },
       { id: 'p-2', timestamp: '10:24:03', level: 'INFO', service: 'PAYMENT', message: 'Initializing Stripe SDK...' },
@@ -134,11 +115,6 @@ export const INITIAL_SERVICES: Service[] = [
       p99: '32 ms',
       requests: '64 req/min'
     },
-    env: [
-      { key: 'PORT', value: '3004' },
-      { key: 'SMTP_HOST', value: 'mail.smtp.internal' },
-      { key: 'QUEUE_NAME', value: 'notifications_queue' }
-    ],
     logs: [
       { id: 'n-1', timestamp: '10:24:02', level: 'INFO', service: 'NOTIF', message: 'Notification daemon initialized' },
       { id: 'n-2', timestamp: '10:24:04', level: 'INFO', service: 'NOTIF', message: 'Connecting to message broker...' },
@@ -166,11 +142,6 @@ export const INITIAL_SERVICES: Service[] = [
       p99: '16 ms',
       requests: '320 req/min'
     },
-    env: [
-      { key: 'PORT', value: '3000' },
-      { key: 'PROXY_TIMEOUT', value: '5000' },
-      { key: 'RATE_LIMIT', value: '1000' }
-    ],
     logs: [
       { id: 'gw-1', timestamp: '10:23:40', level: 'INFO', service: 'GATEWAY', message: 'API Gateway booting up...' },
       { id: 'gw-2', timestamp: '10:23:45', level: 'INFO', service: 'GATEWAY', message: 'Loading upstream reverse proxies' },
@@ -198,11 +169,6 @@ export const INITIAL_SERVICES: Service[] = [
       p99: '180 ms',
       requests: '52 jobs/min'
     },
-    env: [
-      { key: 'PORT', value: '3005' },
-      { key: 'CONCURRENCY', value: '10' },
-      { key: 'REDIS_QUEUE_URL', value: 'redis://localhost:6379/1' }
-    ],
     logs: [
       { id: 'wk-1', timestamp: '10:19:15', level: 'INFO', service: 'WORKER', message: 'Background worker cluster initialized' },
       { id: 'wk-2', timestamp: '10:19:16', level: 'INFO', service: 'WORKER', message: 'Concurrency set to 10 workers' },

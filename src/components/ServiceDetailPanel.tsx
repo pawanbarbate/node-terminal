@@ -325,27 +325,9 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
               <Box 
                 backgroundColor={activeTab === 'metrics' ? theme.colors.card : undefined} 
                 paddingX={1}
-                marginRight={1}
               >
                 <Text color={activeTab === 'metrics' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'metrics'}>
                   [ Metrics ]
-                </Text>
-              </Box>
-            </Clickable>
-
-            {/* Env Tab */}
-            <Clickable 
-              onClick={() => {
-                onFocus?.();
-                onSelectTab?.('env');
-              }}
-            >
-              <Box 
-                backgroundColor={activeTab === 'env' ? theme.colors.card : undefined} 
-                paddingX={1}
-              >
-                <Text color={activeTab === 'env' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'env'}>
-                  [ Env ]
                 </Text>
               </Box>
             </Clickable>
@@ -419,17 +401,6 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
             <Text color={theme.colors.textSecondary}>Latency P50/P99:</Text>
             <Text color={theme.colors.accent} bold>{service.metrics?.p50 || '18ms'}/{service.metrics?.p99 || '45ms'}</Text>
           </Box>
-        </Box>
-      )}
-
-      {activeTab === 'env' && (
-        <Box flexDirection="column">
-          {(service.env || []).slice(0, maxLogs).map((item, i) => (
-            <Box key={i} justifyContent="space-between" width={Math.min(50, innerWidth)} flexWrap="nowrap">
-              <Text color={theme.colors.accent}>{item.key}</Text>
-              <Text color={theme.colors.textSecondary}>{item.value}</Text>
-            </Box>
-          ))}
         </Box>
       )}
     </Clickable>

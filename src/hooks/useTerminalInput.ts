@@ -304,21 +304,20 @@ export function useTerminalInput({
       return;
     }
 
-    // Tabs switching (1-4 or left/right arrow)
+    // Tabs switching (1-3 or left/right arrow)
     if (input === '1') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'logs' }); return; }
     if (input === '2') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'errors' }); return; }
     if (input === '3') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'metrics' }); return; }
-    if (input === '4') { dispatch({ type: 'SET_ACTIVE_TAB', tab: 'env' }); return; }
 
-    const tabs: ('logs' | 'errors' | 'metrics' | 'env')[] = ['logs', 'errors', 'metrics', 'env'];
+    const tabs: ('logs' | 'errors' | 'metrics')[] = ['logs', 'errors', 'metrics'];
     if (key.leftArrow) {
       const curIdx = tabs.indexOf(state.activeTab);
-      dispatch({ type: 'SET_ACTIVE_TAB', tab: tabs[Math.max(0, curIdx - 1)] as any });
+      dispatch({ type: 'SET_ACTIVE_TAB', tab: tabs[Math.max(0, curIdx - 1)] });
       return;
     }
     if (key.rightArrow) {
       const curIdx = tabs.indexOf(state.activeTab);
-      dispatch({ type: 'SET_ACTIVE_TAB', tab: tabs[Math.min(tabs.length - 1, curIdx + 1)] as any });
+      dispatch({ type: 'SET_ACTIVE_TAB', tab: tabs[Math.min(tabs.length - 1, curIdx + 1)] });
       return;
     }
 
