@@ -11,11 +11,13 @@ export interface ServiceConfig {
   port?: number;
   autoStart?: boolean;
   readyPattern?: string;
+  readyTimeoutMs?: number;
 }
 
 export interface OrchestratorSettings {
   bootStaggerMs?: number;
   maxConcurrentBoot?: number;
+  readyTimeoutMs?: number;
 }
 
 export interface DevPulseConfig {

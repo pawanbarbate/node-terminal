@@ -268,7 +268,7 @@ class ProcessManager {
    */
   public async waitForServiceReady(
     service: ServiceConfig,
-    timeoutMs = 15000,
+    timeoutMs = 30000,
     pollIntervalMs = 250,
     signal?: AbortSignal
   ): Promise<boolean> {
@@ -806,7 +806,8 @@ class ProcessManager {
             }
 
             // Wait for readiness before downstream tiers can proceed
-            const isReady = await this.waitForServiceReady(service, 15000, 250, signal);
+            const readinessTimeout = service.readyTimeoutMs ?? settings?.readyTimeoutMs ?? 30000;
+            const isReady = await this.waitForServiceReady(service, readinessTimeout, 250, signal);
             if (!isReady) {
               if (signal?.aborted) return false;
               await this.stopService(service.name, callbacks);

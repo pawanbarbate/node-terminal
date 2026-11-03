@@ -16,6 +16,8 @@ export const CONFIG_FILENAMES = [
 
 export interface CliArgs {
   configPath?: string;
+  help?: boolean;
+  version?: boolean;
 }
 
 export interface ConfigFileSummary {
@@ -178,12 +180,18 @@ export function validateConfig(value: unknown): string[] {
  */
 export function parseCliArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   let configPath: string | undefined;
+  let help = false;
+  let version = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg) continue;
 
-    if (arg === '-c' || arg === '--config') {
+    if (arg === '-h' || arg === '--help') {
+      help = true;
+    } else if (arg === '-v' || arg === '--version') {
+      version = true;
+    } else if (arg === '-c' || arg === '--config') {
       if (argv[i + 1] && !argv[i + 1]?.startsWith('-')) {
         configPath = argv[i + 1];
         i++;
@@ -195,7 +203,7 @@ export function parseCliArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     }
   }
 
-  return { configPath };
+  return { configPath, help, version };
 }
 
 /**

@@ -10,6 +10,44 @@ import { processManager } from './services/processManager.js';
 import { DevPulseConfig } from './types/config.js';
 import { theme } from './theme/theme.js';
 import { logger } from './logger/logger.js';
+import { appVersion } from './version.js';
+
+const cliArgs = parseCliArgs();
+
+if (cliArgs.help) {
+  console.log(`
+DevPulse v${appVersion}
+Interactive TUI dashboard and process orchestrator for microservices and fullstack development
+
+Usage:
+  devpulse [options] [config-file]
+
+Options:
+  -c, --config <path>   Path to configuration file (*.devpulse.json)
+  -h, --help            Show this help message and exit
+  -v, --version         Show application version and exit
+
+Controls inside TUI:
+  ↑ / ↓, j / k          Navigate services / scroll logs
+  Enter                 Focus service logs
+  1, 2, 3               Switch tabs (Logs, Errors, Process)
+  r                     Restart selected service
+  s                     Stop or Start selected service
+  /                     Search global logs
+  f                     Cycle service filter
+  l, Space              Toggle live log following
+  p                     Switch configuration profile
+  t, Tab                Cycle panel focus
+  ?                     Toggle help modal
+  q, Ctrl+C             Exit DevPulse
+`.trim());
+  process.exit(0);
+}
+
+if (cliArgs.version) {
+  console.log(`devpulse v${appVersion}`);
+  process.exit(0);
+}
 
 const interactiveTerminal = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 const screenReaderMode = process.env.INK_SCREEN_READER === 'true';
@@ -50,6 +88,18 @@ process.once('SIGTERM', () => {
   cleanup();
   process.exit(143);
 });
+process.on('uncaughtException', (err) => {
+  cleanup();
+  console.error('\nDevPulse encountered an unexpected error:');
+  console.error(err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  cleanup();
+  console.error('\nDevPulse unhandled promise rejection:');
+  console.error(reason);
+  process.exit(1);
+});
 
 if (!interactiveTerminal) {
   console.error('DevPulse requires an interactive TTY. Run it from a terminal with stdin and stdout attached.');
@@ -62,7 +112,6 @@ writeTerminalControl(
   'enter interactive terminal mode'
 );
 
-const cliArgs = parseCliArgs();
 if (cliArgs.configPath && !hasConfigFile(cliArgs.configPath)) {
   cleanup();
   console.error(`\x1b[31mError: Specified configuration file not found: ${cliArgs.configPath}\x1b[0m`);

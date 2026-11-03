@@ -24,6 +24,10 @@
         "maxConcurrentBoot": {
           "type": "integer",
           "minimum": 1
+        },
+        "readyTimeoutMs": {
+          "type": "integer",
+          "minimum": 100
         }
       },
       "additionalProperties": true
@@ -97,6 +101,10 @@
         },
         "readyPattern": {
           "type": "string"
+        },
+        "readyTimeoutMs": {
+          "type": "integer",
+          "minimum": 100
         }
       },
       "required": [
