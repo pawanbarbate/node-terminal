@@ -4,7 +4,7 @@ export type ServiceStatus = 'running' | 'stopped' | 'starting' | 'warning' | 'wa
 
 export type ActivePanel = 'services' | 'serviceLogs' | 'globalLogs';
 
-export type ActiveTab = 'logs' | 'errors' | 'metrics' | 'env';
+export type ActiveTab = 'logs' | 'errors';
 
 export type NarrowTab = 'services' | 'detail' | 'logs';
 
@@ -66,13 +66,14 @@ export interface ProcessCallbacks {
 }
 
 export interface SystemMetrics {
-  cpu: number;
-  memoryUsed: number;
-  memoryTotal: number;
+  cpu?: number;
+  memoryUsed?: number;
+  memoryTotal?: number;
   servicesRunning: number;
   servicesTotal: number;
   uptime: string;
-  errors1h: number;
+  errorsTotal?: number;
+  errors1h?: number;
 }
 
 export interface ViewportInfo {

@@ -122,6 +122,9 @@ export const Clickable: React.FC<ClickableProps> = ({
   const id = propId || autoId;
   const { register, unregister } = useClickManager();
 
+  const onClickRef = useRef(onClick);
+  onClickRef.current = onClick;
+
   const updateBounds = useCallback(() => {
     if (!ref.current || disabled) {
       unregister(id);
@@ -132,7 +135,7 @@ export const Clickable: React.FC<ClickableProps> = ({
     if (measured.width > 0 && measured.height > 0) {
       register({
         id,
-        onClick,
+        onClick: () => onClickRef.current(),
         disabled,
         // measureElement returns 0-indexed layout coordinates relative to root.
         // Terminal SGR mouse coordinates are 1-indexed.
@@ -142,12 +145,11 @@ export const Clickable: React.FC<ClickableProps> = ({
         maxY: measured.y + measured.height
       });
     }
-  }, [id, onClick, disabled, register, unregister]);
+  }, [id, disabled, register, unregister]);
 
-  // Re-measure after every layout render pass so dynamic size/position updates register immediately
   useEffect(() => {
     updateBounds();
-  });
+  }, [updateBounds]);
 
   // Clean unregister on unmount
   useEffect(() => {

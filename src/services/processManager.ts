@@ -1,7 +1,7 @@
-import { spawn, ChildProcess } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import net from 'net';
+import { spawn, execSync, ChildProcess } from 'node:child_process';
+import path from 'node:path';
+import fs from 'node:fs';
+import net from 'node:net';
 import { ServiceConfig, OrchestratorSettings } from '../types/config.js';
 import { LogEntry, ProcessCallbacks, ServiceStatus } from '../types/index.js';
 import { logger } from '../logger/logger.js';
@@ -17,6 +17,8 @@ interface ActiveProcessInfo {
 
 class ProcessManager {
   private activeProcesses = new Map<string, ActiveProcessInfo>();
+  private stoppingProcesses = new Set<string>();
+  private activePreCommands = new Set<ChildProcess>();
   private knownConfigs = new Map<string, ServiceConfig>();
   private logCounter = 0;
 
@@ -36,7 +38,6 @@ class ProcessManager {
   private killProcessTree(pid: number, signal: NodeJS.Signals = 'SIGTERM') {
     if (process.platform === 'win32') {
       try {
-        const { execSync } = require('child_process');
         execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' });
       } catch {}
     } else {
@@ -85,6 +86,11 @@ class ProcessManager {
         }
       });
 
+      this.activePreCommands.add(child);
+      const cleanupPre = () => {
+        this.activePreCommands.delete(child);
+      };
+
       let stdoutRemainder = '';
       child.stdout?.on('data', (chunk: Buffer) => {
         stdoutRemainder += chunk.toString();
@@ -120,6 +126,7 @@ class ProcessManager {
       });
 
       child.on('close', (code) => {
+        cleanupPre();
         if (code === 0) {
           callbacks.onLog(service.name, {
             id: `step-done-${service.name}-${Date.now()}-${this.logCounter++}`,
@@ -141,6 +148,7 @@ class ProcessManager {
       });
 
       child.on('error', (err) => {
+        cleanupPre();
         callbacks.onLog(service.name, {
           id: `step-err-${service.name}-${Date.now()}-${this.logCounter++}`,
           timestamp: this.formatTime(),
@@ -153,10 +161,7 @@ class ProcessManager {
     });
   }
 
-  /**
-   * Probe whether a local TCP port is open and listening
-   */
-  public probeTcpPort(port: number, host = '127.0.0.1', timeoutMs = 300): Promise<boolean> {
+  private singleProbe(port: number, host: string, timeoutMs: number): Promise<boolean> {
     return new Promise((resolve) => {
       const socket = new net.Socket();
       socket.setTimeout(timeoutMs);
@@ -174,6 +179,18 @@ class ProcessManager {
       });
       socket.connect(port, host);
     });
+  }
+
+  /**
+   * Probe whether a local TCP port is open and listening (with dual-stack IPv4/IPv6 fallback)
+   */
+  public async probeTcpPort(port: number, host = '127.0.0.1', timeoutMs = 300): Promise<boolean> {
+    const ok = await this.singleProbe(port, host, timeoutMs);
+    if (ok) return true;
+    if (host === '127.0.0.1') {
+      return this.singleProbe(port, '::1', timeoutMs);
+    }
+    return false;
   }
 
   /**
@@ -214,6 +231,14 @@ class ProcessManager {
     callbacks: ProcessCallbacks
   ): Promise<number | null> {
     this.knownConfigs.set(service.name, service);
+
+    // If currently shutting down, wait up to 1500ms for old process to fully exit
+    if (this.stoppingProcesses.has(service.name)) {
+      const startWait = Date.now();
+      while (this.stoppingProcesses.has(service.name) && Date.now() - startWait < 1500) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
 
     // If already running, return existing PID
     if (this.activeProcesses.has(service.name)) {
@@ -435,18 +460,18 @@ class ProcessManager {
   /**
    * Stop a single running service and notify callbacks
    */
-  public stopService(
+  public async stopService(
     serviceName: string,
     callbacks?: ProcessCallbacks
   ): Promise<boolean> {
     const info = this.activeProcesses.get(serviceName);
     if (!info) {
       if (callbacks) callbacks.onStatusChange(serviceName, 'stopped');
-      return Promise.resolve(false);
+      return false;
     }
 
+    this.stoppingProcesses.add(serviceName);
     const { child, pid } = info;
-    this.activeProcesses.delete(serviceName);
 
     if (callbacks) {
       callbacks.onStatusChange(serviceName, 'stopped');
@@ -459,37 +484,44 @@ class ProcessManager {
       });
     }
 
-    return new Promise<boolean>((resolve) => {
-      let resolved = false;
-      const done = () => {
-        if (!resolved) {
-          resolved = true;
-          resolve(true);
+    try {
+      return await new Promise<boolean>((resolve) => {
+        let resolved = false;
+        const done = () => {
+          if (!resolved) {
+            resolved = true;
+            this.activeProcesses.delete(serviceName);
+            this.stoppingProcesses.delete(serviceName);
+            resolve(true);
+          }
+        };
+
+        if (child.exitCode !== null || child.killed) {
+          done();
+          return;
         }
-      };
 
-      if (child.exitCode !== null || child.killed) {
-        done();
-        return;
-      }
+        child.once('close', done);
+        child.once('exit', done);
 
-      child.once('close', done);
-      child.once('exit', done);
+        // Send SIGTERM to process group
+        this.killProcessTree(pid, 'SIGTERM');
 
-      // Send SIGTERM to process group
-      this.killProcessTree(pid, 'SIGTERM');
-
-      // Hard kill fallback after 800ms
-      setTimeout(() => {
-        if (!resolved) {
-          try {
-            process.kill(pid, 0);
-            this.killProcessTree(pid, 'SIGKILL');
-          } catch {}
-          setTimeout(done, 150);
-        }
-      }, 800);
-    });
+        // Hard kill fallback after 800ms
+        setTimeout(() => {
+          if (!resolved) {
+            try {
+              process.kill(pid, 0);
+              this.killProcessTree(pid, 'SIGKILL');
+            } catch {}
+            setTimeout(done, 150);
+          }
+        }, 800);
+      });
+    } finally {
+      this.activeProcesses.delete(serviceName);
+      this.stoppingProcesses.delete(serviceName);
+    }
   }
 
   /**
@@ -688,8 +720,14 @@ class ProcessManager {
    * Asynchronously stop all active processes
    */
   public async stopAll(): Promise<void> {
+    for (const child of this.activePreCommands) {
+      if (child.pid) this.killProcessTree(child.pid, 'SIGKILL');
+    }
+    this.activePreCommands.clear();
+
     const pids = Array.from(this.activeProcesses.values()).map(info => info.pid);
     this.activeProcesses.clear();
+    this.stoppingProcesses.clear();
 
     for (const pid of pids) {
       this.killProcessTree(pid, 'SIGTERM');
@@ -709,8 +747,14 @@ class ProcessManager {
    * Synchronous stop for process.on('exit') and SIGINT handlers
    */
   public stopAllSync(): void {
+    for (const child of this.activePreCommands) {
+      if (child.pid) this.killProcessTree(child.pid, 'SIGKILL');
+    }
+    this.activePreCommands.clear();
+
     const pids = Array.from(this.activeProcesses.values()).map(info => info.pid);
     this.activeProcesses.clear();
+    this.stoppingProcesses.clear();
 
     for (const pid of pids) {
       this.killProcessTree(pid, 'SIGKILL');

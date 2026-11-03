@@ -1,30 +1,66 @@
 #!/usr/bin/env node
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { render } from 'ink';
 import DevPulse from './DevPulse.js';
 import SetupWizard from './components/wizard/SetupWizard.js';
 import ConfigSelectorScreen from './components/selector/ConfigSelectorScreen.js';
+import NoConfigWelcomeScreen from './components/welcome/NoConfigWelcomeScreen.js';
 import { loadConfigFile, hasConfigFile, getConfigFilePath, parseCliArgs, getConfigFileSummaries, ConfigFileSummary } from './services/configManager.js';
 import { processManager } from './services/processManager.js';
 import { DevPulseConfig } from './types/config.js';
 import { theme } from './theme/theme.js';
 import { logger } from './logger/logger.js';
 
-// 1. Enter alternate screen buffer first
-// 2. Set universal canvas background (OSC 11 + 24-bit TrueColor BCE: #0B0F19)
-// 3. Home cursor to row 1, col 1, hide cursor, and enable clean SGR mouse click & wheel reporting
-process.stdout.write(`\x1b[?1049h${theme.ansi.setCanvasBg}\x1b[H\x1b[?1000h\x1b[?1006h\x1b[?25l`);
+// 0. Handle CLI Help & Version flags before any terminal buffer initialization
+const args = process.argv.slice(2);
+if (args.includes('-h') || args.includes('--help')) {
+  console.log(`
+DevPulse - Modern Terminal Workspace Orchestrator for Multi-Service Apps
+
+Usage:
+  devpulse [options] [config-file]
+
+Options:
+  -c, --config <file>   Specify a custom DevPulse config file
+  -h, --help            Show this help message
+  -v, --version         Show DevPulse version
+
+Controls:
+  ↑/↓ or j/k            Navigate services
+  Enter                 Inspect service logs / details
+  r                     Restart selected service
+  s                     Stop or Start selected service
+  1 / 2                 Switch tabs (Logs, Errors)
+  /                     Search logs
+  f                     Cycle service filter
+  Space / l             Toggle live streaming
+  q / Ctrl+C            Exit DevPulse
+`);
+  process.exit(0);
+}
+
+if (args.includes('-v') || args.includes('--version')) {
+  console.log('devpulse v1.0.0');
+  process.exit(0);
+}
+
+if (!process.stdout.isTTY) {
+  console.error('Error: DevPulse requires an interactive TTY terminal to run.');
+  process.exit(1);
+}
+
+// 1. Initialize canvas background (24-bit TrueColor BCE + OSC 11), home cursor, and enable SGR mouse reporting
+process.stdout.write(`${theme.ansi.initScreen}\x1b[?1000h\x1b[?1006h\x1b[?25l`);
 
 const cleanup = () => {
-  // Terminate any active process trees immediately
   try {
     processManager.stopAllSync();
   } catch {}
-  // Reset terminal background color (OSC 111 + ANSI attribute reset), disable mouse reporting, exit alternate screen, and restore cursor
   try {
-    process.stdout.write(`${theme.ansi.resetCanvasBg}\x1b[?1000l\x1b[?1006l\x1b[?1049l\x1b[?25h`);
+    process.stdout.write(`${theme.ansi.restoreScreen}\x1b[?1000l\x1b[?1006l\x1b[?25h`);
   } catch {}
 };
+
 process.on('exit', cleanup);
 process.on('SIGINT', () => {
   cleanup();
@@ -43,6 +79,24 @@ if (cliArgs.configPath && !hasConfigFile(cliArgs.configPath)) {
 }
 
 const App: React.FC = () => {
+  // Guarantee alternate screen buffer has canvas background (OSC 11 + TrueColor BCE) applied on mount and resize
+  useEffect(() => {
+    try {
+      process.stdout.write(`${theme.ansi.initScreen}\x1b[?1000h\x1b[?1006h\x1b[?25l`);
+    } catch {}
+
+    const handleResize = () => {
+      try {
+        process.stdout.write(theme.ansi.initScreen);
+      } catch {}
+    };
+
+    process.stdout.on('resize', handleResize);
+    return () => {
+      process.stdout.off('resize', handleResize);
+    };
+  }, []);
+
   const [summaries, setSummaries] = useState<ConfigFileSummary[]>(() =>
     !cliArgs.configPath ? getConfigFileSummaries(process.cwd()) : []
   );
@@ -69,7 +123,7 @@ const App: React.FC = () => {
     return null;
   });
 
-  const [mode, setMode] = useState<'dashboard' | 'wizard' | 'selector'>(() => {
+  const [mode, setMode] = useState<'dashboard' | 'wizard' | 'selector' | 'welcome'>(() => {
     if (cliArgs.configPath) {
       return hasConfigFile(cliArgs.configPath) ? 'dashboard' : 'wizard';
     }
@@ -81,7 +135,7 @@ const App: React.FC = () => {
       const singleConfig = loadConfigFile(currentSummaries[0].path);
       if (singleConfig) return 'dashboard';
     }
-    return 'wizard';
+    return 'welcome';
   });
 
   const handleSelectProfile = (chosenPath: string) => {
@@ -103,8 +157,10 @@ const App: React.FC = () => {
     setSummaries(freshSummaries);
     if (freshSummaries.length > 1) {
       setMode('selector');
+    } else if (freshSummaries.length === 1) {
+      setMode('dashboard');
     } else {
-      setMode('wizard');
+      setMode('welcome');
     }
   };
 
@@ -114,6 +170,18 @@ const App: React.FC = () => {
     if (refreshed) setActiveConfigPath(refreshed);
     setMode('dashboard');
   };
+
+  if (mode === 'welcome') {
+    return (
+      <NoConfigWelcomeScreen
+        onCreateNew={() => setMode('wizard')}
+        onCancel={() => {
+          cleanup();
+          process.exit(0);
+        }}
+      />
+    );
+  }
 
   if (mode === 'selector') {
     return (
@@ -137,9 +205,10 @@ const App: React.FC = () => {
         onCancel={() => {
           if (summaries.length > 1) {
             setMode('selector');
+          } else if (summaries.length === 1) {
+            setMode('dashboard');
           } else {
-            cleanup();
-            process.exit(0);
+            setMode('welcome');
           }
         }}
       />

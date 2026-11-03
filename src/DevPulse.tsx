@@ -59,14 +59,35 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().toTimeString().split(' ')[0] || '12:00:00';
-      const cpuChange = Math.floor(Math.random() * 5) - 2;
-      dispatch({ type: 'TICK_CLOCK', time: now, cpuChange });
+      dispatch({ type: 'TICK_CLOCK', time: now });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   const selectedService = state.services[state.selectedIndex] || state.services[0];
   const activeFilter = state.filterOptions[state.filterIndex] || 'All Services';
+
+  // Dynamically derive honest system status for Header
+  const runningCount = state.services.filter(s => s.status === 'running').length;
+  const startingCount = state.services.filter(s => s.status === 'starting').length;
+  const totalCount = state.services.length;
+
+  let headerStatus = 'All Systems Running';
+  let headerColor: string = theme.colors.running;
+
+  if (totalCount === 0) {
+    headerStatus = 'No Services Configured';
+    headerColor = theme.colors.textMuted;
+  } else if (startingCount > 0) {
+    headerStatus = 'Booting Services';
+    headerColor = theme.colors.accent;
+  } else if (runningCount === 0) {
+    headerStatus = 'All Services Stopped';
+    headerColor = theme.colors.stopped;
+  } else if (runningCount < totalCount) {
+    headerStatus = `${runningCount}/${totalCount} Services Active`;
+    headerColor = theme.colors.warning;
+  }
 
   return (
     <ClickProvider clickManagerRef={clickManagerRef}>
@@ -82,7 +103,8 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
         {/* 1. Header Bar (Row 1, guaranteed 1 line) */}
         <Header 
           time={state.time} 
-          systemStatus="All Systems Running" 
+          systemStatus={headerStatus} 
+          statusColor={headerColor}
           width={viewport.width}
         />
 
@@ -164,9 +186,9 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
           </Box>
         ) : (
           /* Standard 2-Column Responsive Dashboard */
-          <Box flexDirection="row" width={viewport.width} height={viewport.contentHeight}>
+          <Box flexDirection="row" width={viewport.width} height={viewport.contentHeight} backgroundColor={theme.colors.canvas}>
             {/* Left Column (Services & System) */}
-            <Box flexDirection="column" width={viewport.leftPanelWidth} height={viewport.contentHeight} marginRight={1}>
+            <Box flexDirection="column" width={viewport.leftPanelWidth} height={viewport.contentHeight} marginRight={1} backgroundColor={theme.colors.canvas}>
               <ServicesPanel 
                 services={state.services} 
                 selectedIndex={state.selectedIndex}
@@ -186,7 +208,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
             </Box>
 
             {/* Right Column (Service Detail & Global Logs) */}
-            <Box flexDirection="column" width={viewport.rightPanelWidth} height={viewport.contentHeight}>
+            <Box flexDirection="column" width={viewport.rightPanelWidth} height={viewport.contentHeight} backgroundColor={theme.colors.canvas}>
               <ServiceDetailPanel 
                 service={selectedService} 
                 activeTab={state.activeTab}

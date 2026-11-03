@@ -5,12 +5,14 @@ import { theme } from '../theme/theme.js';
 export interface HeaderProps {
   time?: string;
   systemStatus?: string;
+  statusColor?: string;
   width?: number;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({ 
   time = '10:24:17', 
   systemStatus = 'All Systems Running',
+  statusColor = theme.colors.running,
   width = 120
 }) => {
   const isNarrow = width < 95;
@@ -41,15 +43,15 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         {!isVeryNarrow && (
           <>
             <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
-              <Text color={theme.colors.textSecondary}>v0.1.0</Text>
+              <Text color={theme.colors.textSecondary}>v1.0.0</Text>
             </Box>
             <Text color={theme.colors.textDim}>│ </Text>
           </>
         )}
         <Text color={theme.colors.textSecondary}>🕒 {time}</Text>
         <Text color={theme.colors.textDim}> │ </Text>
-        <Text color={theme.colors.running}>● </Text>
-        <Text color={theme.colors.running} bold>
+        <Text color={statusColor}>● </Text>
+        <Text color={statusColor} bold>
           {isNarrow 
             ? (systemStatus === 'All Systems Running' ? 'Running' : systemStatus.replace('Workspace ', '')) 
             : systemStatus}

@@ -69,7 +69,7 @@ export const initialDashboardState: DashboardState = {
 
 export function configToServices(config?: DevPulseConfig): Service[] {
   if (!config || !config.services || config.services.length === 0) {
-    return INITIAL_SERVICES;
+    return [];
   }
 
   return config.services.map((s, idx) => ({
@@ -83,17 +83,10 @@ export function configToServices(config?: DevPulseConfig): Service[] {
       ? s.command.join(' && ')
       : (s.command || (Array.isArray(s.commands) ? s.commands.join(' && ') : '')),
     path: s.path,
-    port: s.port ? `:${s.port}` : ':3000',
+    port: s.port ? `:${s.port}` : '',
     pid: '-',
     errors: 0,
     rawConfig: s,
-    metrics: {
-      cpu: '0%',
-      memory: '0 MB',
-      p50: '0 ms',
-      p99: '0 ms',
-      requests: '0 req/min'
-    },
     env: [],
     logs: [],
     errorLogs: []
@@ -102,20 +95,25 @@ export function configToServices(config?: DevPulseConfig): Service[] {
 
 export function createInitialDashboardState(config?: DevPulseConfig): DashboardState {
   const services = configToServices(config);
-  const filterOptions = config?.services && config.services.length > 0
-    ? ['All Services', ...config.services.map(s => s.name)]
-    : FILTER_OPTIONS;
+  const filterOptions = services.length > 0
+    ? ['All Services', ...services.map(s => s.name)]
+    : ['All Services'];
+
+  const now = new Date().toTimeString().split(' ')[0] || '00:00:00';
 
   return {
     ...initialDashboardState,
+    time: now,
+    uptimeSeconds: 0,
     startedAt: Date.now(),
     services,
-    globalLogs: config?.services && config.services.length > 0 ? [] : INITIAL_GLOBAL_LOGS,
+    globalLogs: [],
     filterOptions,
     metrics: {
-      ...INITIAL_SYSTEM_METRICS,
       servicesTotal: services.length,
-      servicesRunning: 0
+      servicesRunning: 0,
+      uptime: '0s',
+      errorsTotal: 0
     }
   };
 }
@@ -142,11 +140,9 @@ export type DashboardAction =
   | { type: 'START_RESTART_SERVICE'; index: number }
   | { type: 'FINISH_RESTART_SERVICE'; index: number }
   | { type: 'TOGGLE_STOP_SERVICE'; index: number }
-  | { type: 'TICK_CLOCK'; time: string; cpuChange: number }
-  | { type: 'APPEND_GLOBAL_LOG'; log: LogEntry; timeStr: string }
+  | { type: 'TICK_CLOCK'; time: string }
   | { type: 'APPEND_REAL_LOG'; serviceName: string; log: LogEntry }
-  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string }
-  | { type: 'UPDATE_SERVICE_METRICS'; metrics: Record<string, { cpu?: string; memory?: string }> };
+  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string };
 
 export function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
   switch (action.type) {
@@ -351,7 +347,7 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         : state.uptimeSeconds + 1;
       const mins = Math.floor(nextUptime / 60);
       const secs = nextUptime % 60;
-      const newCpu = Math.min(48, Math.max(12, state.metrics.cpu + action.cpuChange));
+      const uptimeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
       const updatedServices = state.services.map(s => {
         if (s.status === 'running') {
@@ -369,6 +365,9 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         return s;
       });
 
+      const totalErrors = updatedServices.reduce((acc, s) => acc + (s.errors || 0), 0);
+      const runningCount = updatedServices.filter(s => s.status === 'running').length;
+
       return {
         ...state,
         time: action.time,
@@ -376,8 +375,10 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
         services: updatedServices,
         metrics: {
           ...state.metrics,
-          uptime: `${mins}m ${secs}s`,
-          cpu: newCpu
+          uptime: uptimeStr,
+          servicesRunning: runningCount,
+          servicesTotal: updatedServices.length,
+          errorsTotal: totalErrors
         }
       };
     }
@@ -386,26 +387,34 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
       const nextGlobal = [...state.globalLogs.slice(-200), action.log];
       const isError = action.log.level === 'error' || action.log.level === 'ERROR';
 
+      let totalErrors = 0;
       const nextServices = state.services.map(s => {
         if (s.name.toLowerCase() === action.serviceName.toLowerCase()) {
           const nextLogs = [...(s.logs || []).slice(-200), action.log];
           const nextErrors = isError
             ? [...(s.errorLogs || []).slice(-100), action.log]
             : (s.errorLogs || []);
+          const updatedErrors = s.errors + (isError ? 1 : 0);
+          totalErrors += updatedErrors;
           return {
             ...s,
             logs: nextLogs,
             errorLogs: nextErrors,
-            errors: s.errors + (isError ? 1 : 0)
+            errors: updatedErrors
           };
         }
+        totalErrors += (s.errors || 0);
         return s;
       });
 
       return {
         ...state,
         globalLogs: nextGlobal,
-        services: nextServices
+        services: nextServices,
+        metrics: {
+          ...state.metrics,
+          errorsTotal: totalErrors
+        }
       };
     }
 
@@ -442,53 +451,6 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
           ...state.metrics,
           servicesRunning: runningCount
         }
-      };
-    }
-
-    case 'UPDATE_SERVICE_METRICS': {
-      const nextServices = state.services.map(s => {
-        const m = action.metrics[s.name];
-        if (m) {
-          return {
-            ...s,
-            metrics: {
-              ...s.metrics,
-              cpu: m.cpu || s.metrics?.cpu,
-              memory: m.memory || s.metrics?.memory
-            }
-          };
-        }
-        return s;
-      });
-
-      return {
-        ...state,
-        services: nextServices
-      };
-    }
-
-    case 'APPEND_GLOBAL_LOG': {
-      const nextGlobal = [...state.globalLogs.slice(-30), action.log];
-      const nextServices = state.services.map(s => {
-        if (s.name.toUpperCase().includes(action.log.service.toUpperCase())) {
-          return {
-            ...s,
-            logs: [...(s.logs || []).slice(-25), {
-              id: `${action.log.id}-s`,
-              timestamp: action.timeStr,
-              service: action.log.service,
-              level: action.log.level,
-              message: action.log.message
-            }]
-          };
-        }
-        return s;
-      });
-
-      return {
-        ...state,
-        globalLogs: nextGlobal,
-        services: nextServices
       };
     }
 

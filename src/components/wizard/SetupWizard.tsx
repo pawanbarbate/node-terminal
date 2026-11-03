@@ -265,7 +265,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
     const config: DevPulseConfig = {
       $schema: 'https://devpulse.dev/schema.json',
-      name: process.cwd().split('/').pop() || 'Workspace',
+      name: path.basename(process.cwd()) || 'Workspace',
       version: '1.0.0',
       services
     };
@@ -352,7 +352,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         setIsEditingNew(false);
         loadServiceToForm(services[selectedIndex] || services[0]!);
         setActivePanel('services');
-      } 
+      } else if (onCancel) {
+        onCancel();
+      }
       return;
     }
 
@@ -586,9 +588,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           </Box>
         ) : (
           /* Standard 2-Column Responsive Setup View matching DevPulse synergy */
-          <Box flexDirection="row" width={viewport.width}>
+          <Box flexDirection="row" width={viewport.width} backgroundColor={theme.colors.canvas}>
             {/* Left Column: Service Registry & Multiplier Actions */}
-            <Box flexDirection="column" width={leftPanelWidth} marginRight={1}>
+            <Box flexDirection="column" width={leftPanelWidth} marginRight={1} backgroundColor={theme.colors.canvas}>
               <WizardRegistryPanel 
                 services={services}
                 selectedIndex={selectedIndex}
@@ -613,7 +615,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             </Box>
 
             {/* Right Column: Service Form & Configuration */}
-            <Box flexDirection="column" width={rightPanelWidth}>
+            <Box flexDirection="column" width={rightPanelWidth} backgroundColor={theme.colors.canvas}>
               <WizardFormPanel 
                 isEditingNew={isEditingNew}
                 editingIndex={selectedIndex}

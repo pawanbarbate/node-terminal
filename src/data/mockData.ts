@@ -376,6 +376,7 @@ export const INITIAL_SYSTEM_METRICS: SystemMetrics = {
   servicesRunning: 5,
   servicesTotal: 6,
   uptime: '12m 34s',
-  errors1h: 3
+  errors1h: 3,
+  errorsTotal: 3
 };
 

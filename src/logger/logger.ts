@@ -4,18 +4,30 @@ import path from "node:path";
 
 const logDir = path.join(process.cwd(), "logs");
 const logFile = path.join(logDir, "app.log");
+let dirChecked = false;
 
-fs.mkdirSync(logDir, { recursive: true });
+function ensureLogDir(): void {
+  if (dirChecked) return;
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+    dirChecked = true;
+  } catch {
+    // Silently continue if directory cannot be created (e.g., read-only filesystem)
+  }
+}
 
 function writeLog(level: string, message: string): void {
+  ensureLogDir();
   const timestamp = new Date().toISOString();
   const log = `[${timestamp}] [${level}] ${message}\n`;
 
-  fs.appendFile(logFile, log, (err) => {
-    if (err) {
-      console.error("Failed to write log:", err.message);
-    }
-  });
+  try {
+    fs.appendFile(logFile, log, () => {
+      // Intentionally silent on error to prevent corrupting the TUI terminal screen
+    });
+  } catch {
+    // Ignore synchronous write errors
+  }
 }
 
 export const logger = {

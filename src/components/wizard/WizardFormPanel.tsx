@@ -176,6 +176,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               backgroundColor={focusedField === 'name' ? theme.colors.cardHover : theme.colors.card}
               borderStyle={focusedField === 'name' ? 'round' : undefined}
               borderColor={focusedField === 'name' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+              borderBackgroundColor={theme.colors.surface}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -208,6 +209,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               backgroundColor={focusedField === 'path' ? theme.colors.cardHover : theme.colors.card}
               borderStyle={focusedField === 'path' ? 'round' : undefined}
               borderColor={focusedField === 'path' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+              borderBackgroundColor={theme.colors.surface}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -248,6 +250,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               backgroundColor={focusedField === 'command' ? theme.colors.cardHover : theme.colors.card}
               borderStyle={focusedField === 'command' ? 'round' : undefined}
               borderColor={focusedField === 'command' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+              borderBackgroundColor={theme.colors.surface}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -279,6 +282,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                   backgroundColor={focusedField === 'port' ? theme.colors.cardHover : theme.colors.card}
                   borderStyle={focusedField === 'port' ? 'round' : undefined}
                   borderColor={focusedField === 'port' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  borderBackgroundColor={theme.colors.surface}
                   paddingX={1}
                 >
                   <Box width={labelWidth}>
@@ -299,6 +303,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                   backgroundColor={focusedField === 'autoStart' ? theme.colors.cardHover : theme.colors.card}
                   borderStyle={focusedField === 'autoStart' ? 'round' : undefined}
                   borderColor={focusedField === 'autoStart' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  borderBackgroundColor={theme.colors.surface}
                   paddingX={1}
                 >
                   <Box width={labelWidth}>
@@ -327,6 +332,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                   backgroundColor={focusedField === 'port' ? theme.colors.cardHover : theme.colors.card}
                   borderStyle={focusedField === 'port' ? 'round' : undefined}
                   borderColor={focusedField === 'port' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  borderBackgroundColor={theme.colors.surface}
                   paddingX={1}
                 >
                   <Box width={labelWidth}>
@@ -349,6 +355,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
                   backgroundColor={focusedField === 'autoStart' ? theme.colors.cardHover : theme.colors.card}
                   borderStyle={focusedField === 'autoStart' ? 'round' : undefined}
                   borderColor={focusedField === 'autoStart' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+                  borderBackgroundColor={theme.colors.surface}
                   paddingX={1}
                 >
                   <Text color={focusedField === 'autoStart' ? theme.colors.accent : theme.colors.textSecondary} bold={focusedField === 'autoStart'}>
@@ -373,6 +380,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               backgroundColor={focusedField === 'dependsOn' ? theme.colors.cardHover : theme.colors.card}
               borderStyle={focusedField === 'dependsOn' ? 'round' : undefined}
               borderColor={focusedField === 'dependsOn' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+              borderBackgroundColor={theme.colors.surface}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -413,6 +421,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
               backgroundColor={focusedField === 'preStart' ? theme.colors.cardHover : theme.colors.card}
               borderStyle={focusedField === 'preStart' ? 'round' : undefined}
               borderColor={focusedField === 'preStart' ? theme.colors.borderFocus : theme.colors.borderSubtle}
+              borderBackgroundColor={theme.colors.surface}
               paddingX={1}
               marginBottom={0}
               flexWrap="nowrap"
@@ -441,6 +450,7 @@ export const WizardFormPanel: React.FC<WizardFormPanelProps> = React.memo(({
             flexDirection="column"
             borderStyle="round"
             borderColor={theme.colors.borderSubtle}
+            borderBackgroundColor={theme.colors.surface}
             backgroundColor={theme.colors.card}
             paddingX={1}
             marginTop={1}

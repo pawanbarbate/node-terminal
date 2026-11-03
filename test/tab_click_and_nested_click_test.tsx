@@ -100,7 +100,7 @@ async function testNestedClickablePrecedence() {
 
 // TEST 2: Reducer tab state transition
 function testReducerTabTransitions() {
-  const tabs = ['logs', 'errors', 'metrics', 'env'] as const;
+  const tabs = ['logs', 'errors'] as const;
 
   for (const tab of tabs) {
     const nextState = dashboardReducer(initialDashboardState, {

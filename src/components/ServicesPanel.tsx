@@ -106,7 +106,12 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
       </Clickable>
 
       {/* Services List - Discrete Enclosed Cards (Boxed Tiles) */}
-      <Box flexDirection="column" marginTop={0}>
+      {services.length === 0 ? (
+        <Box flexDirection="column" marginTop={1} paddingX={1} backgroundColor={theme.colors.surface}>
+          <Text color={theme.colors.textMuted}>No services configured</Text>
+        </Box>
+      ) : (
+        <Box flexDirection="column" marginTop={0} backgroundColor={theme.colors.surface}>
         {visibleServices.map((service, vIndex) => {
           const index = startIndex + vIndex;
           const isSelected = index === selectedIndex;
@@ -127,7 +132,8 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
                 }}
                 borderStyle="round"
                 borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
-                backgroundColor={isSelected ? theme.colors.card : undefined}
+                borderBackgroundColor={theme.colors.surface}
+                backgroundColor={isSelected ? theme.colors.cardSelected : theme.colors.card}
                 flexDirection="row" 
                 justifyContent="space-between"
                 alignItems="center"
@@ -173,7 +179,8 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
               }}
               borderStyle="round"
               borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
-              backgroundColor={isSelected ? theme.colors.card : undefined}
+              borderBackgroundColor={theme.colors.surface}
+              backgroundColor={isSelected ? theme.colors.cardSelected : theme.colors.card}
               flexDirection="column"
               paddingX={1}
               width="100%"
@@ -225,6 +232,7 @@ export const ServicesPanel: React.FC<ServicesPanelProps> = React.memo(({
           );
         })}
       </Box>
+      )}
     </Box>
   );
 });

@@ -108,8 +108,8 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
 
         {/* Empty State with Architecture Presets */}
         {services.length === 0 ? (
-          <Box flexDirection="column" marginTop={0}>
-            <Box backgroundColor={theme.colors.card} paddingX={1} paddingY={0} flexDirection="column" borderStyle="round" borderColor={theme.colors.borderSubtle}>
+          <Box flexDirection="column" marginTop={0} backgroundColor={theme.colors.surface}>
+            <Box backgroundColor={theme.colors.card} paddingX={1} paddingY={0} flexDirection="column" borderStyle="round" borderColor={theme.colors.borderSubtle} borderBackgroundColor={theme.colors.surface}>
               <Text color={theme.colors.accent} bold>⚡ QUICK ARCHITECTURE PRESETS:</Text>
               <Text color={theme.colors.textMuted}>Select a pre-configured multi-service stack:</Text>
 
@@ -165,7 +165,8 @@ export const WizardRegistryPanel: React.FC<WizardRegistryPanelProps> = React.mem
                   onClick={() => onSelectService?.(realIdx)}
                   borderStyle="round"
                   borderColor={isSelected ? theme.colors.borderFocus : theme.colors.borderDefault}
-                  backgroundColor={isSelected ? theme.colors.card : undefined}
+                  borderBackgroundColor={theme.colors.surface}
+                  backgroundColor={isSelected ? theme.colors.cardSelected : theme.colors.card}
                   paddingX={1}
                   flexDirection="column"
                   width="100%"

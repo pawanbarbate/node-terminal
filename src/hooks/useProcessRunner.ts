@@ -17,10 +17,27 @@ export function useProcessRunner({ config, state, dispatch }: UseProcessRunnerPr
   const servicesRef = useRef(state.services);
   servicesRef.current = state.services;
 
+  const pausedBufferRef = useRef<{ serviceName: string; log: LogEntry }[]>([]);
+
+  // Flush buffered logs when live mode resumes
+  useEffect(() => {
+    if (state.isLive && pausedBufferRef.current.length > 0) {
+      const buffered = pausedBufferRef.current.splice(0, pausedBufferRef.current.length);
+      for (const item of buffered) {
+        dispatch({ type: 'APPEND_REAL_LOG', serviceName: item.serviceName, log: item.log });
+      }
+    }
+  }, [state.isLive, dispatch]);
+
   const callbacksRef = useRef<ProcessCallbacks>({
     onLog: (serviceName: string, log: LogEntry) => {
       if (isLiveRef.current) {
         dispatch({ type: 'APPEND_REAL_LOG', serviceName, log });
+      } else {
+        pausedBufferRef.current.push({ serviceName, log });
+        if (pausedBufferRef.current.length > 500) {
+          pausedBufferRef.current.shift();
+        }
       }
     },
     onStatusChange: (serviceName: string, status, pid, error, statusText) => {
@@ -43,6 +60,7 @@ export function useProcessRunner({ config, state, dispatch }: UseProcessRunnerPr
 
   // 3. Restart service handler
   const handleRestart = useCallback(async (index: number) => {
+    if (!config?.services || config.services.length === 0) return;
     const service = servicesRef.current[index];
     if (!service) return;
 
@@ -54,10 +72,11 @@ export function useProcessRunner({ config, state, dispatch }: UseProcessRunnerPr
       autoStart: true
     };
     await processManager.restartService(service.name, callbacksRef.current, targetConfig);
-  }, [dispatch]);
+  }, [config, dispatch]);
 
   // 4. Toggle stop / run service handler
   const handleToggleStop = useCallback(async (index: number) => {
+    if (!config?.services || config.services.length === 0) return;
     const service = servicesRef.current[index];
     if (!service) return;
 
@@ -74,7 +93,7 @@ export function useProcessRunner({ config, state, dispatch }: UseProcessRunnerPr
       };
       await processManager.startService(targetConfig, callbacksRef.current);
     }
-  }, [dispatch]);
+  }, [config, dispatch]);
 
   return {
     handleRestart,

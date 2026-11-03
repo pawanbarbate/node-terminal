@@ -52,10 +52,16 @@ export const theme = {
   // Terminal ANSI Escape Sequences: Support BOTH OSC 11 and 24-bit TrueColor BCE
   ansi: {
     canvasRgb: [11, 15, 25] as const,
-    // OSC 11 + 24-bit TrueColor Background Color Erase (\x1b[48;2;11;15;25m\x1b[2J)
-    setCanvasBg: '\x1b]11;#0B0F19\x07\x1b[48;2;11;15;25m\x1b[2J',
-    // OSC 111 + ANSI Attribute Reset (\x1b[0m\x1b[2J)
-    resetCanvasBg: '\x1b]111\x07\x1b[0m\x1b[2J',
+    // 24-bit TrueColor Background Color Erase (\x1b[48;2;11;15;25m\x1b[2J)
+    setCanvasBg: '\x1b[48;2;11;15;25m\x1b[2J',
+    // ANSI Attribute Reset (\x1b[0m\x1b[2J)
+    resetCanvasBg: '\x1b[0m\x1b[2J',
+    // Dynamic Terminal Background OSC 11 Set/Reset (xterm, iTerm2, Alacritty, Kitty, WezTerm)
+    osc11Set: '\x1b]11;#0B0F19\x1b\\',
+    osc11Reset: '\x1b]111\x1b\\',
+    // Comprehensive Cross-Platform Alternate Screen Buffer Initialization
+    initScreen: '\x1b]11;#0B0F19\x1b\\\x1b[48;2;11;15;25m\x1b[2J\x1b[H',
+    restoreScreen: '\x1b]111\x1b\\\x1b[0m\x1b[2J',
   }
 } as const;
 

@@ -46,8 +46,8 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({ onClose, width 
           <Text color={theme.colors.textSecondary}>Stop or Start selected service</Text>
         </Box>
         <Box justifyContent="space-between">
-          <Text color="#A78BFA" bold>1  2  3  4  /  ← →</Text>
-          <Text color={theme.colors.textSecondary}>Switch tabs (Logs, Errors, Metrics, Env)</Text>
+          <Text color="#A78BFA" bold>1  2  /  ← →</Text>
+          <Text color={theme.colors.textSecondary}>Switch tabs (Logs, Errors)</Text>
         </Box>
         <Box justifyContent="space-between">
           <Text color={theme.colors.accent} bold>/</Text>

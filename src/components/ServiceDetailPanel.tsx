@@ -43,7 +43,25 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
   onSelectTab,
   onFocus
 }) => {
-  if (!service) return null;
+  if (!service) {
+    return (
+      <Box 
+        borderStyle="round" 
+        borderColor={theme.colors.borderDefault} 
+        borderBackgroundColor={theme.colors.canvas}
+        backgroundColor={theme.colors.surface}
+        flexDirection="column" 
+        justifyContent="center"
+        alignItems="center"
+        paddingX={2}
+        width={panelWidth}
+        height={height}
+        marginBottom={1}
+      >
+        <Text color={theme.colors.textMuted}>No service selected</Text>
+      </Box>
+    );
+  }
 
   const isNarrow = panelWidth < 65;
   const innerWidth = Math.max(20, panelWidth - 4);
@@ -281,7 +299,7 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
               }}
             >
               <Box 
-                backgroundColor={activeTab === 'logs' ? theme.colors.card : undefined} 
+                backgroundColor={activeTab === 'logs' ? theme.colors.card : theme.colors.surface} 
                 paddingX={1}
                 marginRight={1}
               >
@@ -299,9 +317,8 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
               }}
             >
               <Box 
-                backgroundColor={activeTab === 'errors' ? theme.colors.card : undefined} 
+                backgroundColor={activeTab === 'errors' ? theme.colors.card : theme.colors.surface} 
                 paddingX={1}
-                marginRight={1}
               >
                 <Text color={activeTab === 'errors' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'errors'}>
                   [ Errors{' '}
@@ -311,41 +328,6 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
                 </Text>
                 <Text color={activeTab === 'errors' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'errors'}>
                   {' ]'}
-                </Text>
-              </Box>
-            </Clickable>
-
-            {/* Metrics Tab */}
-            <Clickable 
-              onClick={() => {
-                onFocus?.();
-                onSelectTab?.('metrics');
-              }}
-            >
-              <Box 
-                backgroundColor={activeTab === 'metrics' ? theme.colors.card : undefined} 
-                paddingX={1}
-                marginRight={1}
-              >
-                <Text color={activeTab === 'metrics' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'metrics'}>
-                  [ Metrics ]
-                </Text>
-              </Box>
-            </Clickable>
-
-            {/* Env Tab */}
-            <Clickable 
-              onClick={() => {
-                onFocus?.();
-                onSelectTab?.('env');
-              }}
-            >
-              <Box 
-                backgroundColor={activeTab === 'env' ? theme.colors.card : undefined} 
-                paddingX={1}
-              >
-                <Text color={activeTab === 'env' ? theme.colors.accent : theme.colors.textMuted} bold={activeTab === 'env'}>
-                  [ Env ]
                 </Text>
               </Box>
             </Clickable>
@@ -361,21 +343,27 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
       {/* 5. Tab Content */}
       {activeTab === 'logs' && (
         <Box flexDirection="column">
-          {visibleLogs.map((log, index) => (
-            <Box key={index} flexDirection="row" alignItems="center" flexWrap="nowrap">
-              <Box width={9} flexShrink={0}>
-                <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+          {visibleLogs.map((log, index) => {
+            const lvl = (log.level || 'info').toUpperCase();
+            const lvlText = lvl === 'ERROR' ? 'ERROR' : lvl === 'WARN' ? 'WARN ' : 'INFO ';
+            const lvlColor = lvl === 'ERROR' ? theme.colors.stopped : lvl === 'WARN' ? theme.colors.warning : theme.colors.accent;
+
+            return (
+              <Box key={index} flexDirection="row" alignItems="center" flexWrap="nowrap">
+                <Box width={9} flexShrink={0}>
+                  <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+                </Box>
+                <Box flexShrink={0} marginRight={1}>
+                  <Text color={theme.colors.textDim}>[</Text>
+                  <Text color={lvlColor} bold>{lvlText}</Text>
+                  <Text color={theme.colors.textDim}>] </Text>
+                </Box>
+                <Box flexGrow={1} flexShrink={1}>
+                  {renderLogMessage(log.message)}
+                </Box>
               </Box>
-              <Box flexShrink={0} marginRight={1}>
-                <Text color={theme.colors.textDim}>[</Text>
-                <Text color={theme.colors.accent} bold>INFO </Text>
-                <Text color={theme.colors.textDim}>] </Text>
-              </Box>
-              <Box flexGrow={1} flexShrink={1}>
-                {renderLogMessage(log.message)}
-              </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Box>
       )}
 
@@ -402,34 +390,6 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
               <Text color={theme.colors.running}>✔ No active errors logged for {service.name}</Text>
             </Box>
           )}
-        </Box>
-      )}
-
-      {activeTab === 'metrics' && (
-        <Box flexDirection="column">
-          <Box justifyContent="space-between" width={Math.min(45, innerWidth)} flexWrap="nowrap">
-            <Text color={theme.colors.textSecondary}>CPU Utilization:</Text>
-            <Text color={theme.colors.textPrimary} bold>{service.metrics?.cpu || '12%'}</Text>
-          </Box>
-          <Box justifyContent="space-between" width={Math.min(45, innerWidth)} flexWrap="nowrap">
-            <Text color={theme.colors.textSecondary}>Memory RSS:</Text>
-            <Text color={theme.colors.textPrimary} bold>{service.metrics?.memory || '120 MB'}</Text>
-          </Box>
-          <Box justifyContent="space-between" width={Math.min(45, innerWidth)} flexWrap="nowrap">
-            <Text color={theme.colors.textSecondary}>Latency P50/P99:</Text>
-            <Text color={theme.colors.accent} bold>{service.metrics?.p50 || '18ms'}/{service.metrics?.p99 || '45ms'}</Text>
-          </Box>
-        </Box>
-      )}
-
-      {activeTab === 'env' && (
-        <Box flexDirection="column">
-          {(service.env || []).slice(0, maxLogs).map((item, i) => (
-            <Box key={i} justifyContent="space-between" width={Math.min(50, innerWidth)} flexWrap="nowrap">
-              <Text color={theme.colors.accent}>{item.key}</Text>
-              <Text color={theme.colors.textSecondary}>{item.value}</Text>
-            </Box>
-          ))}
         </Box>
       )}
     </Clickable>

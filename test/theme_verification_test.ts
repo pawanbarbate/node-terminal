@@ -3,19 +3,19 @@ import assert from 'node:assert';
 
 console.log('--- STARTING THEME & ANSI CANVAS VERIFICATION ---');
 
-// 1. Verify ANSI Escape codes (Universal OSC 11 + 24-bit TrueColor BCE)
+// 1. Verify ANSI Escape codes (24-bit TrueColor BCE)
 console.log('[1] Verifying ANSI sequences...');
 assert.strictEqual(
   theme.ansi.setCanvasBg,
-  '\x1b]11;#0B0F19\x07\x1b[48;2;11;15;25m\x1b[2J',
-  'OSC 11 + TrueColor BCE setCanvasBg match'
+  '\x1b[48;2;11;15;25m\x1b[2J',
+  'TrueColor BCE setCanvasBg match'
 );
 assert.strictEqual(
   theme.ansi.resetCanvasBg,
-  '\x1b]111\x07\x1b[0m\x1b[2J',
-  'OSC 111 + ANSI Reset resetCanvasBg match'
+  '\x1b[0m\x1b[2J',
+  'ANSI Reset resetCanvasBg match'
 );
-console.log('✔ OSC 11 and TrueColor BCE escape sequences valid');
+console.log('✔ TrueColor BCE escape sequences valid');
 
 // 2. Verify Theme Color Tokens (Midnight Slate)
 console.log('[2] Verifying Midnight Slate color tokens...');
