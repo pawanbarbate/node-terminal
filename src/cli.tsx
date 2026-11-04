@@ -1,11 +1,22 @@
 #!/usr/bin/env node
 import React, { useState, useEffect } from 'react';
-import { render } from 'ink';
+import { render, Box } from 'ink';
 import DevPulse from './DevPulse.js';
 import SetupWizard from './components/wizard/SetupWizard.js';
 import ConfigSelectorScreen from './components/selector/ConfigSelectorScreen.js';
 import NoConfigWelcomeScreen from './components/welcome/NoConfigWelcomeScreen.js';
-import { loadConfigFile, hasConfigFile, getConfigFilePath, parseCliArgs, getConfigFileSummaries, ConfigFileSummary } from './services/configManager.js';
+import LoadingScreen from './components/common/LoadingScreen.js';
+import { useTerminalViewport } from './hooks/useTerminalViewport.js';
+import {
+  loadConfigFile,
+  hasConfigFile,
+  getConfigFilePath,
+  parseCliArgs,
+  getConfigFileSummaries,
+  getConfigFileSummariesAsync,
+  resolveInitialAppState,
+  ConfigFileSummary
+} from './services/configManager.js';
 import { processManager } from './services/processManager.js';
 import { DevPulseConfig } from './types/config.js';
 import { theme } from './theme/theme.js';
@@ -97,46 +108,71 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const [summaries, setSummaries] = useState<ConfigFileSummary[]>(() =>
-    !cliArgs.configPath ? getConfigFileSummaries(process.cwd()) : []
+  const viewport = useTerminalViewport();
+
+  const initialSyncState = cliArgs.configPath
+    ? resolveInitialAppState(cliArgs, process.cwd())
+    : null;
+
+  const [summaries, setSummaries] = useState<ConfigFileSummary[]>(
+    () => initialSyncState?.summaries || []
   );
 
-  const [activeConfigPath, setActiveConfigPath] = useState<string | null>(() => {
-    if (cliArgs.configPath) {
-      return getConfigFilePath(cliArgs.configPath);
-    }
-    const currentSummaries = getConfigFileSummaries(process.cwd());
-    if (currentSummaries.length === 1 && currentSummaries[0]) {
-      return currentSummaries[0].path;
-    }
-    return null;
-  });
+  const [activeConfigPath, setActiveConfigPath] = useState<string | null>(
+    () => initialSyncState?.activeConfigPath || null
+  );
 
-  const [config, setConfig] = useState<DevPulseConfig | null>(() => {
-    if (cliArgs.configPath) {
-      return loadConfigFile(cliArgs.configPath);
-    }
-    const currentSummaries = getConfigFileSummaries(process.cwd());
-    if (currentSummaries.length === 1 && currentSummaries[0]) {
-      return loadConfigFile(currentSummaries[0].path);
-    }
-    return null;
-  });
+  const [config, setConfig] = useState<DevPulseConfig | null>(
+    () => initialSyncState?.config || null
+  );
 
-  const [mode, setMode] = useState<'dashboard' | 'wizard' | 'selector' | 'welcome'>(() => {
+  const [mode, setMode] = useState<'loading' | 'dashboard' | 'wizard' | 'selector' | 'welcome'>(
+    () => (initialSyncState ? initialSyncState.mode : 'loading')
+  );
+
+  const [showLoading, setShowLoading] = useState<boolean>(false);
+  const [scanProgress, setScanProgress] = useState<number>(10);
+  const [scanStatus, setScanStatus] = useState<string>('Scanning workspace for configuration profiles...');
+
+  useEffect(() => {
     if (cliArgs.configPath) {
-      return hasConfigFile(cliArgs.configPath) ? 'dashboard' : 'wizard';
+      return;
     }
-    const currentSummaries = getConfigFileSummaries(process.cwd());
-    if (currentSummaries.length > 1) {
-      return 'selector';
-    }
-    if (currentSummaries.length === 1 && currentSummaries[0]) {
-      const singleConfig = loadConfigFile(currentSummaries[0].path);
-      if (singleConfig) return 'dashboard';
-    }
-    return 'welcome';
-  });
+
+    let isMounted = true;
+    const thresholdTimer = setTimeout(() => {
+      if (isMounted) {
+        setShowLoading(true);
+      }
+    }, 120);
+
+    getConfigFileSummariesAsync(process.cwd(), (percent, statusText) => {
+      if (isMounted) {
+        setScanProgress(percent);
+        setScanStatus(statusText);
+      }
+    })
+      .then((asyncSummaries) => {
+        if (!isMounted) return;
+        clearTimeout(thresholdTimer);
+        const resolved = resolveInitialAppState(cliArgs, process.cwd(), asyncSummaries);
+        setSummaries(resolved.summaries);
+        setActiveConfigPath(resolved.activeConfigPath);
+        setConfig(resolved.config);
+        setMode(resolved.mode);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        clearTimeout(thresholdTimer);
+        logger.error(`Async config discovery error: ${err}`);
+        setMode('welcome');
+      });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(thresholdTimer);
+    };
+  }, []);
 
   const handleSelectProfile = (chosenPath: string) => {
     const loaded = loadConfigFile(chosenPath);
@@ -154,14 +190,11 @@ const App: React.FC = () => {
     } catch {}
 
     const freshSummaries = getConfigFileSummaries(process.cwd());
-    setSummaries(freshSummaries);
-    if (freshSummaries.length > 1) {
-      setMode('selector');
-    } else if (freshSummaries.length === 1) {
-      setMode('dashboard');
-    } else {
-      setMode('welcome');
-    }
+    const resolved = resolveInitialAppState(cliArgs, process.cwd(), freshSummaries);
+    setSummaries(resolved.summaries);
+    setActiveConfigPath(resolved.activeConfigPath);
+    setConfig(resolved.config);
+    setMode(resolved.mode);
   };
 
   const handleWizardComplete = (newConfig: DevPulseConfig) => {
@@ -170,6 +203,26 @@ const App: React.FC = () => {
     if (refreshed) setActiveConfigPath(refreshed);
     setMode('dashboard');
   };
+
+  if (mode === 'loading') {
+    if (!showLoading) {
+      return (
+        <Box
+          width={viewport.width}
+          height={viewport.height}
+          backgroundColor={theme.colors.canvas}
+        />
+      );
+    }
+    return (
+      <LoadingScreen
+        progress={scanProgress}
+        statusText={scanStatus}
+        width={viewport.width}
+        height={viewport.height}
+      />
+    );
+  }
 
   if (mode === 'welcome') {
     return (
