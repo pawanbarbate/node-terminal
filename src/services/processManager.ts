@@ -181,16 +181,32 @@ class ProcessManager {
     });
   }
 
+  private isPortListeningViaCli(port: number): boolean {
+    try {
+      if (process.platform === 'darwin' || process.platform === 'linux') {
+        const out = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN 2>/dev/null`, { timeout: 500 }).toString();
+        return out.includes('LISTEN');
+      } else if (process.platform === 'win32') {
+        const out = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { timeout: 500 }).toString();
+        return out.includes('LISTENING');
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
   /**
-   * Probe whether a local TCP port is open and listening (with dual-stack IPv4/IPv6 fallback)
+   * Probe whether a local TCP port is open and listening (with dual-stack IPv4/IPv6 fallback & CLI fallback)
    */
   public async probeTcpPort(port: number, host = '127.0.0.1', timeoutMs = 300): Promise<boolean> {
     const ok = await this.singleProbe(port, host, timeoutMs);
     if (ok) return true;
     if (host === '127.0.0.1') {
-      return this.singleProbe(port, '::1', timeoutMs);
+      const okIpv6 = await this.singleProbe(port, '::1', timeoutMs);
+      if (okIpv6) return true;
     }
-    return false;
+    return this.isPortListeningViaCli(port);
   }
 
   /**

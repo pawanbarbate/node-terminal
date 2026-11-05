@@ -10,12 +10,13 @@ async function runCascadingBootTests() {
   console.log('\n[Test 1] Testing dependency wave execution with port readiness...');
   const bootOrder: string[] = [];
   const serviceStatuses = new Map<string, { status: ServiceStatus; statusText?: string }>();
+  const testPortA = 12000 + Math.floor(Math.random() * 8000);
 
   const serviceA: ServiceConfig = {
     name: 'svc-database',
     path: '.',
-    command: 'node -e "const http = require(\'http\'); const s = http.createServer((q, r) => r.end(\'ok\')); s.listen(9881, () => { console.log(\'DB_READY\'); }); setInterval(() => {}, 1000);"',
-    port: 9881,
+    command: `node -e "const http = require('http'); const s = http.createServer((q, r) => r.end('ok')); s.listen(${testPortA}, () => { console.log('DB_READY'); }); setInterval(() => {}, 1000);"`,
+    port: testPortA,
     autoStart: true
   };
 
@@ -23,7 +24,6 @@ async function runCascadingBootTests() {
     name: 'svc-api',
     path: '.',
     command: 'node -e "console.log(\'API_BOOTED\'); setInterval(() => {}, 1000);"',
-    port: 9882,
     autoStart: true,
     dependsOn: ['svc-database']
   };
@@ -38,18 +38,18 @@ async function runCascadingBootTests() {
     }
   };
 
-  await processManager.startAll([serviceA, serviceB], callbacks);
+  try {
+    await processManager.startAll([serviceA, serviceB], callbacks);
 
-  // Allow short moment for child process outputs
-  await new Promise(r => setTimeout(r, 800));
+    // Allow short moment for child process outputs
+    await new Promise(r => setTimeout(r, 1200));
 
-  assert.strictEqual(bootOrder[0], 'DATABASE_READY', 'Database must be ready before API boots');
-  assert.strictEqual(bootOrder[1], 'API_BOOTED', 'API booted after Database');
-  console.log('✔ Cascading boot order verified: Database ready -> API booted');
-
-  // Clean up
-  processManager.stopService('svc-database');
-  processManager.stopService('svc-api');
+    assert.strictEqual(bootOrder[0], 'DATABASE_READY', 'Database must be ready before API boots');
+    assert.strictEqual(bootOrder[1], 'API_BOOTED', 'API booted after Database');
+    console.log('✔ Cascading boot order verified: Database ready -> API booted');
+  } finally {
+    await processManager.stopAll();
+  }
 
   // Test 2: Dependency Failure Cascades BLOCKED status
   console.log('\n[Test 2] Testing cascading BLOCKED status on upstream failure...');

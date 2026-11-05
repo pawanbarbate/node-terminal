@@ -60,24 +60,25 @@ if (!process.stdout.isTTY) {
   process.exit(1);
 }
 
-// 1. Initialize canvas background (24-bit TrueColor BCE + OSC 11), home cursor, and enable SGR mouse reporting
-process.stdout.write(`${theme.ansi.initScreen}\x1b[?1000h\x1b[?1006h\x1b[?25l`);
-
+let isCleanedUp = false;
 const cleanup = () => {
+  if (isCleanedUp) return;
+  isCleanedUp = true;
   try {
     processManager.stopAllSync();
   } catch {}
   try {
-    process.stdout.write(`${theme.ansi.restoreScreen}\x1b[?1000l\x1b[?1006l\x1b[?25h`);
+    // Complete atomic restoration: reset colors, disable mouse, show cursor, leave alternate buffer
+    process.stdout.write(theme.ansi.restoreScreen);
   } catch {}
 };
 
-process.on('exit', cleanup);
-process.on('SIGINT', () => {
+process.once('exit', cleanup);
+process.once('SIGINT', () => {
   cleanup();
   process.exit(0);
 });
-process.on('SIGTERM', () => {
+process.once('SIGTERM', () => {
   cleanup();
   process.exit(0);
 });
@@ -90,10 +91,10 @@ if (cliArgs.configPath && !hasConfigFile(cliArgs.configPath)) {
 }
 
 const App: React.FC = () => {
-  // Guarantee alternate screen buffer has canvas background (OSC 11 + TrueColor BCE) applied on mount and resize
+  // Initialize canvas background (TrueColor BCE) strictly on alternate screen buffer on mount and resize
   useEffect(() => {
     try {
-      process.stdout.write(`${theme.ansi.initScreen}\x1b[?1000h\x1b[?1006h\x1b[?25l`);
+      process.stdout.write(`\x1b[?1049h${theme.ansi.initScreen}\x1b[?1000h\x1b[?1006h\x1b[?25l`);
     } catch {}
 
     const handleResize = () => {

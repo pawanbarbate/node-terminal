@@ -44,6 +44,9 @@ export interface DashboardState {
   filterIndex: number;
   filterOptions: string[];
   showHelp: boolean;
+  toastMessage?: string | null;
+  toastExpiresAt?: number;
+  inspectingLog?: LogEntry | null;
 }
 
 export const initialDashboardState: DashboardState = {
@@ -64,7 +67,9 @@ export const initialDashboardState: DashboardState = {
   isSearching: false,
   filterIndex: 0,
   filterOptions: FILTER_OPTIONS,
-  showHelp: false
+  showHelp: false,
+  toastMessage: null,
+  inspectingLog: null
 };
 
 export function configToServices(config?: DevPulseConfig): Service[] {
@@ -142,7 +147,11 @@ export type DashboardAction =
   | { type: 'TOGGLE_STOP_SERVICE'; index: number }
   | { type: 'TICK_CLOCK'; time: string }
   | { type: 'APPEND_REAL_LOG'; serviceName: string; log: LogEntry }
-  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string };
+  | { type: 'PROCESS_STATUS_CHANGED'; serviceName: string; status: ServiceStatus; pid?: number; error?: string; statusText?: string }
+  | { type: 'SHOW_TOAST'; message: string; durationMs?: number }
+  | { type: 'HIDE_TOAST' }
+  | { type: 'OPEN_LOG_INSPECTOR'; log: LogEntry }
+  | { type: 'CLOSE_LOG_INSPECTOR' };
 
 export function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
   switch (action.type) {
@@ -368,11 +377,20 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
       const totalErrors = updatedServices.reduce((acc, s) => acc + (s.errors || 0), 0);
       const runningCount = updatedServices.filter(s => s.status === 'running').length;
 
+      let toastMessage = state.toastMessage;
+      let toastExpiresAt = state.toastExpiresAt;
+      if (toastExpiresAt && now >= toastExpiresAt) {
+        toastMessage = null;
+        toastExpiresAt = undefined;
+      }
+
       return {
         ...state,
         time: action.time,
         uptimeSeconds: nextUptime,
         services: updatedServices,
+        toastMessage,
+        toastExpiresAt,
         metrics: {
           ...state.metrics,
           uptime: uptimeStr,
@@ -400,7 +418,8 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
             ...s,
             logs: nextLogs,
             errorLogs: nextErrors,
-            errors: updatedErrors
+            errors: updatedErrors,
+            lastError: isError ? action.log.message : s.lastError
           };
         }
         totalErrors += (s.errors || 0);
@@ -434,6 +453,8 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
             startedAt,
             uptime: isNowRunning ? (wasRunning ? s.uptime : '0s') : '0s',
             uptimeSeconds: isNowRunning ? (wasRunning ? (s.uptimeSeconds || 0) : 0) : 0,
+            lastError: action.error || s.lastError,
+            restarts: (action.status === 'starting' && wasRunning) ? (s.restarts || 0) + 1 : s.restarts,
             restartingServiceId: action.status === 'running' && state.restartingServiceId === s.id
               ? null
               : state.restartingServiceId
@@ -451,6 +472,36 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
           ...state.metrics,
           servicesRunning: runningCount
         }
+      };
+    }
+
+    case 'SHOW_TOAST': {
+      return {
+        ...state,
+        toastMessage: action.message,
+        toastExpiresAt: Date.now() + (action.durationMs ?? 2500)
+      };
+    }
+
+    case 'HIDE_TOAST': {
+      return {
+        ...state,
+        toastMessage: null,
+        toastExpiresAt: undefined
+      };
+    }
+
+    case 'OPEN_LOG_INSPECTOR': {
+      return {
+        ...state,
+        inspectingLog: action.log
+      };
+    }
+
+    case 'CLOSE_LOG_INSPECTOR': {
+      return {
+        ...state,
+        inspectingLog: null
       };
     }
 

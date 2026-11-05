@@ -19,6 +19,9 @@ export interface GlobalLogsPanelProps {
   onCycleFilter?: () => void;
   onToggleLive?: () => void;
   onFocus?: () => void;
+  onCopyCurrent?: () => void;
+  onCopyLog?: (log: LogEntry) => void;
+  onInspectLog?: (log: LogEntry) => void;
 }
 
 export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({ 
@@ -35,7 +38,10 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
   onToggleSearch,
   onCycleFilter,
   onToggleLive,
-  onFocus
+  onFocus,
+  onCopyCurrent,
+  onCopyLog,
+  onInspectLog
 }) => {
   const isNarrow = panelWidth < 65;
   const innerWidth = Math.max(20, panelWidth - 4);
@@ -185,6 +191,7 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
             <Box 
               backgroundColor={isLive ? theme.colors.runningBg : theme.colors.warningBg} 
               paddingX={1}
+              marginRight={1}
               flexShrink={0}
             >
               <Text 
@@ -192,6 +199,19 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
                 bold
               >
                 [ ● {isLive ? 'Live' : 'Off'} ]
+              </Text>
+            </Box>
+          </Clickable>
+
+          {/* Copy pill */}
+          <Clickable onClick={() => onCopyCurrent?.()}>
+            <Box 
+              backgroundColor={theme.colors.card} 
+              paddingX={1}
+              flexShrink={0}
+            >
+              <Text color={theme.colors.accent} bold>
+                [ 📋 {isNarrow ? 'C' : 'Copy'} ]
               </Text>
             </Box>
           </Clickable>
@@ -209,21 +229,29 @@ export const GlobalLogsPanel: React.FC<GlobalLogsPanelProps> = React.memo(({
           const badge = getServiceBadgeStyle(log.service);
 
           return (
-            <Box key={log.id} flexDirection="row" alignItems="center" marginBottom={0} flexWrap="nowrap">
-              <Box width={9} flexShrink={0}>
-                <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+            <Clickable
+              key={log.id}
+              onClick={() => {
+                if (onInspectLog) onInspectLog(log);
+                else if (onCopyLog) onCopyLog(log);
+              }}
+            >
+              <Box flexDirection="row" alignItems="center" marginBottom={0} flexWrap="nowrap">
+                <Box width={9} flexShrink={0}>
+                  <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+                </Box>
+                <Box width={11} flexShrink={0} marginRight={1}>
+                  <Text color={theme.colors.textDim}>[</Text>
+                  <Text color={badge.color} bold>
+                    {badge.cleanLabel.padEnd(8)}
+                  </Text>
+                  <Text color={theme.colors.textDim}>] </Text>
+                </Box>
+                <Box flexGrow={1} flexShrink={1}>
+                  {renderMessage(log)}
+                </Box>
               </Box>
-              <Box width={11} flexShrink={0} marginRight={1}>
-                <Text color={theme.colors.textDim}>[</Text>
-                <Text color={badge.color} bold>
-                  {badge.cleanLabel.padEnd(8)}
-                </Text>
-                <Text color={theme.colors.textDim}>] </Text>
-              </Box>
-              <Box flexGrow={1} flexShrink={1}>
-                {renderMessage(log)}
-              </Box>
-            </Box>
+            </Clickable>
           );
         })}
       </Box>

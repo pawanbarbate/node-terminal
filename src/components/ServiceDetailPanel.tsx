@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { Service, ActiveTab } from '../types/index.js';
+import { Service, ActiveTab, LogEntry } from '../types/index.js';
 import Clickable from './common/ClickManager.js';
 import { theme } from '../theme/theme.js';
 import useSpinner from '../hooks/useSpinner.js';
@@ -19,6 +19,9 @@ export interface ServiceDetailPanelProps {
   onToggleStop?: () => void;
   onSelectTab?: (tab: ActiveTab) => void;
   onFocus?: () => void;
+  onCopyCurrent?: () => void;
+  onCopyLog?: (log: LogEntry) => void;
+  onInspectLog?: (log: LogEntry) => void;
 }
 
 const cleanPort = (p?: string | number) => {
@@ -41,7 +44,10 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
   onRestart,
   onToggleStop,
   onSelectTab,
-  onFocus
+  onFocus,
+  onCopyCurrent,
+  onCopyLog,
+  onInspectLog
 }) => {
   if (!service) {
     return (
@@ -222,9 +228,13 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
             </Box>
           </Clickable>
           <Text> </Text>
-          <Box backgroundColor={theme.colors.card} paddingX={1}>
-            <Text color={theme.colors.textMuted}>[ ··· ]</Text>
-          </Box>
+          <Clickable onClick={() => onCopyCurrent?.()}>
+            <Box backgroundColor={theme.colors.card} paddingX={1}>
+              <Text color={theme.colors.accent} bold>
+                [ 📋 {isNarrow ? 'C' : (activeTab === 'errors' ? 'Copy Error' : 'Copy')} ]
+              </Text>
+            </Box>
+          </Clickable>
         </Box>
       </Box>
       
@@ -349,19 +359,27 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
             const lvlColor = lvl === 'ERROR' ? theme.colors.stopped : lvl === 'WARN' ? theme.colors.warning : theme.colors.accent;
 
             return (
-              <Box key={index} flexDirection="row" alignItems="center" flexWrap="nowrap">
-                <Box width={9} flexShrink={0}>
-                  <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+              <Clickable
+                key={index}
+                onClick={() => {
+                  if (onInspectLog) onInspectLog(log);
+                  else if (onCopyLog) onCopyLog(log);
+                }}
+              >
+                <Box flexDirection="row" alignItems="center" flexWrap="nowrap">
+                  <Box width={9} flexShrink={0}>
+                    <Text color={theme.colors.textMuted}>{log.timestamp} </Text>
+                  </Box>
+                  <Box flexShrink={0} marginRight={1}>
+                    <Text color={theme.colors.textDim}>[</Text>
+                    <Text color={lvlColor} bold>{lvlText}</Text>
+                    <Text color={theme.colors.textDim}>] </Text>
+                  </Box>
+                  <Box flexGrow={1} flexShrink={1}>
+                    {renderLogMessage(log.message)}
+                  </Box>
                 </Box>
-                <Box flexShrink={0} marginRight={1}>
-                  <Text color={theme.colors.textDim}>[</Text>
-                  <Text color={lvlColor} bold>{lvlText}</Text>
-                  <Text color={theme.colors.textDim}>] </Text>
-                </Box>
-                <Box flexGrow={1} flexShrink={1}>
-                  {renderLogMessage(log.message)}
-                </Box>
-              </Box>
+              </Clickable>
             );
           })}
         </Box>
@@ -371,19 +389,27 @@ export const ServiceDetailPanel: React.FC<ServiceDetailPanelProps> = React.memo(
         <Box flexDirection="column">
           {service.errorLogs && service.errorLogs.length > 0 ? (
             service.errorLogs.slice(0, maxLogs).map((err, i) => (
-              <Box key={i} flexDirection="row" alignItems="center" flexWrap="nowrap">
-                <Box width={9} flexShrink={0}>
-                  <Text color={theme.colors.textMuted}>{err.timestamp} </Text>
+              <Clickable
+                key={i}
+                onClick={() => {
+                  if (onInspectLog) onInspectLog(err);
+                  else if (onCopyLog) onCopyLog(err);
+                }}
+              >
+                <Box flexDirection="row" alignItems="center" flexWrap="nowrap">
+                  <Box width={9} flexShrink={0}>
+                    <Text color={theme.colors.textMuted}>{err.timestamp} </Text>
+                  </Box>
+                  <Box flexShrink={0} marginRight={1}>
+                    <Text color={theme.colors.textDim}>[</Text>
+                    <Text color={theme.colors.stopped} bold>ERROR</Text>
+                    <Text color={theme.colors.textDim}>] </Text>
+                  </Box>
+                  <Box flexGrow={1} flexShrink={1}>
+                    <Text color={theme.colors.stopped}>{err.message.slice(0, maxMsgLen)}</Text>
+                  </Box>
                 </Box>
-                <Box flexShrink={0} marginRight={1}>
-                  <Text color={theme.colors.textDim}>[</Text>
-                  <Text color={theme.colors.stopped} bold>ERROR</Text>
-                  <Text color={theme.colors.textDim}>] </Text>
-                </Box>
-                <Box flexGrow={1} flexShrink={1}>
-                  <Text color={theme.colors.stopped}>{err.message.slice(0, maxMsgLen)}</Text>
-                </Box>
-              </Box>
+              </Clickable>
             ))
           ) : (
             <Box>

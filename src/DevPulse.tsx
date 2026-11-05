@@ -2,11 +2,11 @@ import React, { useReducer, useEffect, useRef } from 'react';
 import { Box, Text, useApp } from 'ink';
 import Header from './components/Header.js';
 import ServicesPanel from './components/ServicesPanel.js';
-import SystemPanel from './components/SystemPanel.js';
 import ServiceDetailPanel from './components/ServiceDetailPanel.js';
 import GlobalLogsPanel from './components/GlobalLogsPanel.js';
 import Footer from './components/Footer.js';
 import HelpModal from './components/HelpModal.js';
+import LogInspectorModal from './components/common/LogInspectorModal.js';
 import { createInitialDashboardState, dashboardReducer } from './state/dashboardReducer.js';
 import { useTerminalViewport } from './hooks/useTerminalViewport.js';
 import { useTerminalInput } from './hooks/useTerminalInput.js';
@@ -14,6 +14,13 @@ import { useProcessRunner } from './hooks/useProcessRunner.js';
 import { ClickProvider, Clickable, ClickManagerContextValue } from './components/common/ClickManager.js';
 import { theme } from './theme/theme.js';
 import { DevPulseConfig } from './types/config.js';
+import { LogEntry } from './types/index.js';
+import {
+  copyToClipboard,
+  formatLogEntry,
+  formatServiceErrorSummary,
+  formatAllErrors
+} from './utils/clipboard.js';
 
 export interface DevPulseProps {
   config?: DevPulseConfig;
@@ -89,6 +96,51 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
     headerColor = theme.colors.warning;
   }
 
+  // Copy helpers
+  const handleCopyCurrent = () => {
+    if (state.activeTab === 'errors' && selectedService) {
+      const err = selectedService.errorLogs?.[selectedService.errorLogs.length - 1];
+      if (err) {
+        copyToClipboard(err.message);
+        dispatch({ type: 'SHOW_TOAST', message: `✔ Copied error from "${selectedService.name}"` });
+      } else if (selectedService.lastError) {
+        copyToClipboard(selectedService.lastError);
+        dispatch({ type: 'SHOW_TOAST', message: `✔ Copied error from "${selectedService.name}"` });
+      } else {
+        dispatch({ type: 'SHOW_TOAST', message: `ℹ No errors to copy for "${selectedService.name}"` });
+      }
+    } else if (selectedService) {
+      const log = selectedService.logs?.[selectedService.logs.length - 1];
+      if (log) {
+        copyToClipboard(formatLogEntry(log, selectedService.name));
+        dispatch({ type: 'SHOW_TOAST', message: `✔ Copied log from "${selectedService.name}"` });
+      } else {
+        const text = formatServiceErrorSummary(selectedService);
+        copyToClipboard(text);
+        dispatch({ type: 'SHOW_TOAST', message: `✔ Copied summary for "${selectedService.name}"` });
+      }
+    }
+  };
+
+  const handleCopyLog = (log: LogEntry) => {
+    copyToClipboard(log.message);
+    dispatch({ type: 'SHOW_TOAST', message: `✔ Copied log from "${log.service || selectedService?.name || 'service'}"` });
+  };
+
+  const handleInspectLog = (log: LogEntry) => {
+    dispatch({ type: 'OPEN_LOG_INSPECTOR', log });
+  };
+
+  const handleCopyGlobalCurrent = () => {
+    const log = state.globalLogs[state.globalLogs.length - 1];
+    if (log) {
+      copyToClipboard(formatLogEntry(log));
+      dispatch({ type: 'SHOW_TOAST', message: '✔ Copied latest global log' });
+    } else {
+      dispatch({ type: 'SHOW_TOAST', message: 'ℹ No global logs to copy' });
+    }
+  };
+
   return (
     <ClickProvider clickManagerRef={clickManagerRef}>
       <Box 
@@ -106,6 +158,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
           systemStatus={headerStatus} 
           statusColor={headerColor}
           width={viewport.width}
+          toastMessage={state.toastMessage}
         />
 
         {/* 2. Main Content Area */}
@@ -115,7 +168,7 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
             <Box flexDirection="row" marginBottom={0} paddingX={1} flexWrap="nowrap">
               <Clickable onClick={() => dispatch({ type: 'SET_NARROW_TAB', tab: 'services' })}>
                 <Text color={state.narrowTab === 'services' ? theme.colors.accent : theme.colors.textMuted} bold={state.narrowTab === 'services'}>
-                  [1: Services & Sys]{' '}
+                  [1: Services]{' '}
                 </Text>
               </Clickable>
               <Clickable onClick={() => dispatch({ type: 'SET_NARROW_TAB', tab: 'detail' })}>
@@ -141,12 +194,6 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                   onSelectService={(idx) => dispatch({ type: 'SELECT_SERVICE', index: idx })}
                   onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'services' })}
                 />
-                <SystemPanel 
-                  metrics={state.metrics} 
-                  panelWidth={viewport.width}
-                  height={viewport.systemPanelHeight}
-                  isUltraCompact={viewport.isUltraCompactHeight}
-                />
               </Box>
             )}
             {state.narrowTab === 'detail' && (
@@ -163,6 +210,9 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 onToggleStop={() => handleToggleStop(state.selectedIndex)}
                 onSelectTab={(tab) => dispatch({ type: 'SET_ACTIVE_TAB', tab })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'serviceLogs' })}
+                onCopyCurrent={handleCopyCurrent}
+                onCopyLog={handleCopyLog}
+                onInspectLog={handleInspectLog}
               />
             )}
             {state.narrowTab === 'logs' && (
@@ -181,13 +231,16 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 onCycleFilter={() => dispatch({ type: 'CYCLE_FILTER' })}
                 onToggleLive={() => dispatch({ type: 'TOGGLE_LIVE' })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'globalLogs' })}
+                onCopyCurrent={handleCopyGlobalCurrent}
+                onCopyLog={handleCopyLog}
+                onInspectLog={handleInspectLog}
               />
             )}
           </Box>
         ) : (
           /* Standard 2-Column Responsive Dashboard */
           <Box flexDirection="row" width={viewport.width} height={viewport.contentHeight} backgroundColor={theme.colors.canvas}>
-            {/* Left Column (Services & System) */}
+            {/* Left Column (Services Panel Full Height) */}
             <Box flexDirection="column" width={viewport.leftPanelWidth} height={viewport.contentHeight} marginRight={1} backgroundColor={theme.colors.canvas}>
               <ServicesPanel 
                 services={state.services} 
@@ -198,12 +251,6 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 height={viewport.servicesPanelHeight}
                 onSelectService={(idx) => dispatch({ type: 'SELECT_SERVICE', index: idx })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'services' })}
-              />
-              <SystemPanel 
-                metrics={state.metrics} 
-                panelWidth={viewport.leftPanelWidth}
-                height={viewport.systemPanelHeight}
-                isUltraCompact={viewport.isUltraCompactHeight}
               />
             </Box>
 
@@ -223,6 +270,9 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 onToggleStop={() => handleToggleStop(state.selectedIndex)}
                 onSelectTab={(tab) => dispatch({ type: 'SET_ACTIVE_TAB', tab })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'serviceLogs' })}
+                onCopyCurrent={handleCopyCurrent}
+                onCopyLog={handleCopyLog}
+                onInspectLog={handleInspectLog}
               />
               <GlobalLogsPanel 
                 logs={state.globalLogs}
@@ -239,6 +289,9 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
                 onCycleFilter={() => dispatch({ type: 'CYCLE_FILTER' })}
                 onToggleLive={() => dispatch({ type: 'TOGGLE_LIVE' })}
                 onFocus={() => dispatch({ type: 'SET_ACTIVE_PANEL', panel: 'globalLogs' })}
+                onCopyCurrent={handleCopyGlobalCurrent}
+                onCopyLog={handleCopyLog}
+                onInspectLog={handleInspectLog}
               />
             </Box>
           </Box>
@@ -264,6 +317,30 @@ export const DevPulse: React.FC<DevPulseProps> = ({ config, onOpenConfig, onSwit
           >
             <HelpModal 
               onClose={() => dispatch({ type: 'TOGGLE_HELP', show: false })} 
+              width={viewport.width}
+              height={viewport.height}
+            />
+          </Box>
+        )}
+
+        {/* 5. Optional Log Inspector Overlay Modal */}
+        {state.inspectingLog && (
+          <Box 
+            position="absolute" 
+            width={viewport.width} 
+            height={viewport.height} 
+            alignItems="center" 
+            justifyContent="center"
+          >
+            <LogInspectorModal 
+              log={state.inspectingLog}
+              serviceName={selectedService?.name}
+              onClose={() => dispatch({ type: 'CLOSE_LOG_INSPECTOR' })}
+              onCopy={() => {
+                const text = state.inspectingLog?.message || '';
+                copyToClipboard(text);
+                dispatch({ type: 'SHOW_TOAST', message: '✔ Copied inspected message to clipboard!' });
+              }}
               width={viewport.width}
               height={viewport.height}
             />

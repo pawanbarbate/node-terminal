@@ -63,6 +63,11 @@ export const Footer: React.FC<FooterProps> = React.memo(({
         </Box>
         <Text color={theme.colors.stopped}>Run/Stop </Text>
 
+        <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>
+          <Text color={theme.colors.accent} bold>c</Text>
+        </Box>
+        <Text color={theme.colors.textSecondary}>Copy </Text>
+
         {!isNarrow && (
           <>
             <Box backgroundColor={theme.colors.card} paddingX={1} marginRight={1}>

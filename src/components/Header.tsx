@@ -7,13 +7,15 @@ export interface HeaderProps {
   systemStatus?: string;
   statusColor?: string;
   width?: number;
+  toastMessage?: string | null;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({ 
   time = '10:24:17', 
   systemStatus = 'All Systems Running',
   statusColor = theme.colors.running,
-  width = 120
+  width = 120,
+  toastMessage = null
 }) => {
   const isNarrow = width < 95;
   const isVeryNarrow = width < 75;
@@ -33,10 +35,19 @@ export const Header: React.FC<HeaderProps> = React.memo(({
       <Box flexDirection="row" alignItems="center" flexShrink={0}>
         <Text color={theme.colors.accent} bold>~^v~ </Text>
         <Text color={theme.colors.textPrimary} bold>DevPulse</Text>
-        {!isNarrow && (
+        {!isNarrow && !toastMessage && (
           <Text color={theme.colors.textMuted}>  │  Local Development Workspace</Text>
         )}
       </Box>
+
+      {/* Center Toast Banner */}
+      {toastMessage && (
+        <Box backgroundColor={theme.colors.runningBg} paddingX={2} marginX={1} flexShrink={1}>
+          <Text color={theme.colors.running} bold wrap="truncate-end">
+            {toastMessage}
+          </Text>
+        </Box>
+      )}
 
       {/* Right status */}
       <Box flexDirection="row" alignItems="center" flexShrink={0}>

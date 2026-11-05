@@ -49,19 +49,17 @@ export const theme = {
     { bg: '#C2410C', fg: '#FFFFFF' }, // Orange
   ],
 
-  // Terminal ANSI Escape Sequences: Support BOTH OSC 11 and 24-bit TrueColor BCE
+  // Terminal ANSI Escape Sequences: Confined to Alternate Screen Buffer with TrueColor BCE
   ansi: {
     canvasRgb: [11, 15, 25] as const,
     // 24-bit TrueColor Background Color Erase (\x1b[48;2;11;15;25m\x1b[2J)
     setCanvasBg: '\x1b[48;2;11;15;25m\x1b[2J',
     // ANSI Attribute Reset (\x1b[0m\x1b[2J)
     resetCanvasBg: '\x1b[0m\x1b[2J',
-    // Dynamic Terminal Background OSC 11 Set/Reset (xterm, iTerm2, Alacritty, Kitty, WezTerm)
-    osc11Set: '\x1b]11;#0B0F19\x1b\\',
-    osc11Reset: '\x1b]111\x1b\\',
-    // Comprehensive Cross-Platform Alternate Screen Buffer Initialization
-    initScreen: '\x1b]11;#0B0F19\x1b\\\x1b[48;2;11;15;25m\x1b[2J\x1b[H',
-    restoreScreen: '\x1b]111\x1b\\\x1b[0m\x1b[2J',
+    // Alternate Screen Buffer Initialization (TrueColor BCE + cursor home) - ZERO OSC 11 host palette pollution
+    initScreen: '\x1b[48;2;11;15;25m\x1b[2J\x1b[H',
+    // Complete Cross-Platform Restoration on Exit (Reset SGR colors, disable mouse, show cursor, leave alternate buffer)
+    restoreScreen: '\x1b[0m\x1b[49m\x1b[39m\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l',
   }
 } as const;
 

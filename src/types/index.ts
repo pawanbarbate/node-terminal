@@ -57,6 +57,8 @@ export interface Service {
   env?: EnvVar[];
   logs?: LogEntry[];
   errorLogs?: LogEntry[];
+  lastError?: string;
+  restarts?: number;
   rawConfig?: ServiceConfig;
 }
 

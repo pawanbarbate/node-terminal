@@ -11,14 +11,15 @@ const { ConfigSelectorScreen } = await import('../src/components/selector/Config
 
 console.log('--- STARTING CROSS-PLATFORM TERMINAL BACKGROUND VERIFICATION ---');
 
-// 1. Verify ANSI Escape Sequences (TrueColor BCE + OSC 11)
+// 1. Verify ANSI Escape Sequences (TrueColor BCE + Buffer Isolation)
 console.log('[1] Verifying enhanced theme.ansi tokens...');
 assert.strictEqual(theme.ansi.setCanvasBg, '\x1b[48;2;11;15;25m\x1b[2J');
 assert.strictEqual(theme.ansi.resetCanvasBg, '\x1b[0m\x1b[2J');
-assert(theme.ansi.initScreen.includes('11;#0B0F19'), 'initScreen sets OSC 11 to canvas color');
+assert(!theme.ansi.initScreen.includes('11;#0B0F19'), 'initScreen MUST NOT pollute host window with OSC 11');
 assert(theme.ansi.initScreen.includes('48;2;11;15;25m'), 'initScreen applies TrueColor BCE to canvas color');
-assert(theme.ansi.restoreScreen.includes('111'), 'restoreScreen restores terminal background via OSC 111');
-console.log('✔ Terminal buffer ANSI sequences verified');
+assert(theme.ansi.restoreScreen.includes('\x1b[?1049l'), 'restoreScreen cleanly leaves alternate buffer');
+assert(theme.ansi.restoreScreen.includes('\x1b[0m'), 'restoreScreen resets SGR text/bg attributes');
+console.log('✔ Terminal buffer ANSI sequences verified (clean alternate buffer isolation, 0 host pollution)');
 
 // Helper to capture rendered frames from Ink
 function captureRender(element: React.ReactElement): Promise<string> {

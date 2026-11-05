@@ -3,6 +3,12 @@ import { useInput } from 'ink';
 import { DashboardState, DashboardAction, FILTER_OPTIONS } from '../state/dashboardReducer.js';
 import { ViewportInfo } from '../types/index.js';
 import { ClickManagerContextValue } from '../components/common/ClickManager.js';
+import {
+  copyToClipboard,
+  formatLogEntry,
+  formatServiceErrorSummary,
+  formatAllErrors
+} from '../utils/clipboard.js';
 
 interface UseTerminalInputProps {
   state: DashboardState;
@@ -175,6 +181,21 @@ export function useTerminalInput({
     // -------------------------------------------------------------
     // 2. Keyboard Handlers
     // -------------------------------------------------------------
+    // If Log Inspector Modal is open
+    if (state.inspectingLog) {
+      if (key.escape || input === 'q') {
+        dispatch({ type: 'CLOSE_LOG_INSPECTOR' });
+        return;
+      }
+      if (input === 'c' || input === 'y' || key.return) {
+        const text = state.inspectingLog.message;
+        copyToClipboard(text);
+        dispatch({ type: 'SHOW_TOAST', message: '✔ Copied inspected message to clipboard!' });
+        return;
+      }
+      return;
+    }
+
     // If Help Modal is open
     if (state.showHelp) {
       if (key.escape || input === '?' || input === 'q') {
@@ -351,6 +372,90 @@ export function useTerminalInput({
     // Live toggle
     if (input === 'l' || input === ' ') {
       dispatch({ type: 'TOGGLE_LIVE' });
+      return;
+    }
+
+    // View / Inspect full multi-line log or error modal
+    if (input === 'v' || input === 'V') {
+      const curSvc = state.services[state.selectedIndex];
+      let logToInspect = null;
+
+      if (state.activePanel === 'globalLogs') {
+        logToInspect = state.globalLogs[state.globalLogs.length - 1] || null;
+      } else if (state.activeTab === 'errors') {
+        logToInspect = curSvc?.errorLogs?.[curSvc.errorLogs.length - 1] || (curSvc?.lastError ? {
+          id: `err-inspect-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          service: curSvc.name,
+          message: curSvc.lastError,
+          level: 'error' as const
+        } : null);
+      } else {
+        logToInspect = curSvc?.logs?.[curSvc.logs.length - 1] || null;
+      }
+
+      if (logToInspect) {
+        dispatch({ type: 'OPEN_LOG_INSPECTOR', log: logToInspect });
+      } else {
+        dispatch({ type: 'SHOW_TOAST', message: 'ℹ No logs available to inspect' });
+      }
+      return;
+    }
+
+    // Copy all errors of the current service (Shift+C)
+    if (input === 'C') {
+      const curSvc = state.services[state.selectedIndex];
+      if (curSvc) {
+        const text = formatAllErrors(curSvc);
+        copyToClipboard(text);
+        const errCount = curSvc.errorLogs?.length || (curSvc.lastError ? 1 : 0);
+        dispatch({ type: 'SHOW_TOAST', message: `✔ Copied all errors (${errCount}) for "${curSvc.name}"` });
+      }
+      return;
+    }
+
+    // Copy focused log, error, or service summary (c or y)
+    if (input === 'c' || input === 'y') {
+      const curSvc = state.services[state.selectedIndex];
+
+      if (state.activePanel === 'services') {
+        if (curSvc) {
+          const text = formatServiceErrorSummary(curSvc);
+          copyToClipboard(text);
+          dispatch({ type: 'SHOW_TOAST', message: `✔ Copied service summary for "${curSvc.name}"` });
+        }
+      } else if (state.activePanel === 'serviceLogs') {
+        if (curSvc) {
+          if (state.activeTab === 'errors') {
+            const err = curSvc.errorLogs?.[curSvc.errorLogs.length - 1];
+            if (err) {
+              copyToClipboard(err.message);
+              dispatch({ type: 'SHOW_TOAST', message: `✔ Copied error from "${curSvc.name}"` });
+            } else if (curSvc.lastError) {
+              copyToClipboard(curSvc.lastError);
+              dispatch({ type: 'SHOW_TOAST', message: `✔ Copied error from "${curSvc.name}"` });
+            } else {
+              dispatch({ type: 'SHOW_TOAST', message: `ℹ No errors to copy for "${curSvc.name}"` });
+            }
+          } else {
+            const log = curSvc.logs?.[curSvc.logs.length - 1];
+            if (log) {
+              copyToClipboard(formatLogEntry(log, curSvc.name));
+              dispatch({ type: 'SHOW_TOAST', message: `✔ Copied log from "${curSvc.name}"` });
+            } else {
+              dispatch({ type: 'SHOW_TOAST', message: `ℹ No logs to copy for "${curSvc.name}"` });
+            }
+          }
+        }
+      } else if (state.activePanel === 'globalLogs') {
+        const log = state.globalLogs[state.globalLogs.length - 1];
+        if (log) {
+          copyToClipboard(formatLogEntry(log));
+          dispatch({ type: 'SHOW_TOAST', message: '✔ Copied latest global log' });
+        } else {
+          dispatch({ type: 'SHOW_TOAST', message: 'ℹ No global logs to copy' });
+        }
+      }
       return;
     }
   });
